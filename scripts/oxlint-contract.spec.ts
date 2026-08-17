@@ -340,6 +340,43 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     }
   })
 
+  it('keeps type-aware suppression judgement out of the staged lane', async () => {
+    // A type-aware suppression is only sound when every rule the directive
+    // references is enabled. The staged lane runs typeAware off, so it must
+    // not inherit reportUnusedDisableDirectives from the repository config:
+    // an unused-directive report here would fail commits for suppressions the
+    // repo-wide type-aware lint legitimately needs. This case fails if the
+    // staged config ever re-enables that option.
+    const configPath = join(repositoryRoot, '.oxlintrc.staged.json')
+    const configResult = parseConfigFileTextToJson(configPath, await readFile(configPath, 'utf8'))
+    if (configResult.error !== undefined) {
+      throw new Error(flattenDiagnosticMessageText(configResult.error.messageText, '\n'))
+    }
+    const stagedConfig = configResult.config as unknown
+    if (!isRecord(stagedConfig)) throw new Error('.oxlintrc.staged.json must contain a config object')
+    expect(stagedConfig.options).toMatchObject({ reportUnusedDisableDirectives: 'off' })
+
+    const suffix = randomUUID()
+    const path = join(repositoryRoot, 'scripts', `staged-type-aware-probe-${suffix}.ts`)
+    try {
+      await writeFile(path, '// oxlint-disable-next-line typescript/no-misused-promises\nexport const value = 1\n')
+      const lint = runOxlint([
+        '--config',
+        relative(repositoryRoot, configPath),
+        '--format',
+        'unix',
+        relative(repositoryRoot, path),
+      ])
+      const output = normalizedOutput(lint)
+
+      expect(lint.error).toBeUndefined()
+      expect(lint.status, output).toBe(0)
+      expect(output).not.toContain('Unused oxlint-disable directive')
+    } finally {
+      await rm(path, { force: true })
+    }
+  })
+
   it('preserves successful fix output channels', async () => {
     const suffix = randomUUID()
     const path = join(repositoryRoot, 'scripts', `staged-lint-probe-${suffix}.ts`)
