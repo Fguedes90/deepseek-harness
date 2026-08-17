@@ -15,7 +15,7 @@ A new `subprocess/` capability family owns "run and manage a process"; the bash 
 - **`dsh-bash-local` (Consumer)** — `inject: ['subprocess']`; maps each resolved `ShellExecSpec` onto a `SubprocessSpawnSpec` (`['bash', '-c', command]`), keeps its config, `resolve()` defaulting, fused-deadline `timedOut`/`aborted` classification, the `[stderr]`-marked background read merge with its consuming cursor, and the `onProcessDone` subclass hook. `dsh-bash-sandbox` is unchanged apart from redeclaring the inherited inject; it still wraps at the command-string level and re-enters the inherited spawn path.
 - **`dsh-shell` (Service Definition)** — re-exports the moved vocabulary from `dsh-subprocess`, so no bash Consumer changes an import; `ShellExecRequest`/`ShellExecSpec`/`ShellProcess` and the sandbox facts remain bash-owned.
 
-Every composition that loads a bash executor also loads `@deepseek-ai/dsh-subprocess-local` (CLI, examples, the Python bundled runtime, and inline test configs).
+Every composition that loads a bash executor also loads `@deepseek-ai/dsh-subprocess-local` (CLI, examples, and inline test configs).
 
 Background-process lifetime moved from the executor to the subprocess service: the executor no longer retains a live-process set, so an executor reload leaves background work running and readable, and composition teardown (the service's disposal) remains the kill-and-join boundary. One behavioral contract shifted with it: a background spawn failure can no longer be buffered as fake stderr inside the plumbing (the service rejects `done` and buffers nothing for a process that never ran), so the executor injects the `spawn failed: …` note into exactly one `readOutput()` delta.
 

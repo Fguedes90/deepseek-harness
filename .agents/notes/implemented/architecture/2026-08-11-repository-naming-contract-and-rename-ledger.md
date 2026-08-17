@@ -8,7 +8,7 @@ The repository had grown faster than some names. Several package names described
 
 These names are not harmless. A name tells a contributor where a responsibility starts and stops. `Store` suggests data access. `Registry` suggests registrations and lookup. `Runtime` suggests live execution and lifecycle. When one word is used for all three, callers cannot tell which object owns policy, work, or state without reading the implementation.
 
-The repository also used `SDK` in two meanings. The supported Python and TypeScript clients use the JSON-RPC SDK protocol. The project as a whole is DeepSeek Harness, not an SDK project. The removed SDK project toolchain made the broad meaning obsolete, but prose and names preserved parts of it.
+The repository also used `SDK` in two meanings. The supported TypeScript client uses the JSON-RPC SDK protocol. The project as a whole is DeepSeek Harness, not an SDK project. The removed SDK project toolchain made the broad meaning obsolete, but prose and names preserved parts of it.
 
 The last pre-release window made repository-wide renames cheap. Keeping weak names would have turned accidental vocabulary into a compatibility contract.
 
@@ -22,7 +22,7 @@ No family exposes two public vocabularies.
 
 ### Use `SDK` for one thing
 
-`SDK` means the JSON-RPC-based client/server protocol used by the supported Python and TypeScript SDKs. The repository keeps `@deepseek-ai/dsh-sdk-client`, `@deepseek-ai/dsh-sdk-protocol`, and the wire identity `deepseek-harness-sdk-runtime`; the JSON-RPC server belongs to the same family. DeepSeek Harness itself is not an SDK, and the removed project generator, launcher, helper, and launcher telemetry packages stay absent.
+`SDK` means the JSON-RPC-based client/server protocol used by the supported TypeScript SDK client. The repository keeps `@deepseek-ai/dsh-sdk-client`, `@deepseek-ai/dsh-sdk-protocol`, and the wire identity `deepseek-harness-sdk-runtime`; the JSON-RPC server belongs to the same family. DeepSeek Harness itself is not an SDK, and the removed project generator, launcher, helper, and launcher telemetry packages stay absent.
 
 This decision partially supersedes three active decisions. It replaces the retained `bash/`, `pty/`, and `self-modification/` group names and both deferred package targets in the [package-regrouping decision](2026-07-29-package-regrouping.md). It replaces only the repository-wide SDK claim in the [SDK project toolchain removal](../simplification/2026-08-11-remove-sdk-project-toolchain.md), which remains the owner of the deletion and the surviving runtime SDK. It replaces only the package-name rationale in the [tool-call timeout policy](2026-07-07-tool-call-timeout-policy.md); the timeout mechanism and its `guard/timeout-policy/` home remain unchanged.
 
@@ -221,7 +221,7 @@ Keep `/compact`, the command package, and the separate compaction definition and
 | `SessionPersistenceJsonl` | `JsonlSessionPersistence` | Put the implementation qualifier first and keep the capability role intact. |
 | `SessionPersistenceSqlite` | `SqliteSessionPersistence` | Use the same provider naming order as JSONL. |
 | `@deepseek-ai/dsh-session-title-first-message-llm`, cadence `first-message` | `@deepseek-ai/dsh-session-title-first-prompt-llm`, cadence `first-prompt` | The trigger is the first user prompt, not any message in the session log. |
-| `@deepseek-ai/dsh-session-title-all-messages-llm`, cadence `all-user-messages` | `@deepseek-ai/dsh-session-title-all-prompts-llm`, cadence `all-prompts` | The backend refreshes from user prompts. `all messages` wrongly includes assistant and tool events. |
+| `@deepseek-ai/dsh-session-title-all-messages-llm`, cadence `all-user-messages` | deleted (the renamed `all-prompts` provider was removed unmounted) | The backend refreshed from user prompts; `all messages` wrongly included assistant and tool events. |
 | `@deepseek-ai/dsh-code-runtime-worker`, `WorkerCodeRuntime` | `@deepseek-ai/dsh-code-runtime-worker-thread`, `WorkerThreadCodeRuntime` | The implementation uses a Node worker thread. `worker` alone is too broad. |
 | `SubprocessService` | `SubprocessRuntime` | The service owns live child-process execution and lifecycle. Keep its package and key. |
 | `LocalSubprocessService` | `LocalSubprocessRuntime` | The provider runs same-host processes and process trees. |
@@ -342,7 +342,7 @@ The following debated names stay unchanged because the current scope is accurate
 
 **Prefix every npm package with its group.** Rejected. Flat npm names do not need a copy of the directory tree. A mechanical prefix adds length without explaining the package role.
 
-**Call the whole repository an SDK.** Rejected. The project is an agent harness. SDK is the supported JSON-RPC client/server stack used by Python and TypeScript clients. Two meanings make package names and product prose ambiguous.
+**Call the whole repository an SDK.** Rejected. The project is an agent harness. SDK is the supported JSON-RPC client/server stack used by the TypeScript SDK client. Two meanings make package names and product prose ambiguous.
 
 **Use `Service` for every Cordis service class.** Rejected. Cordis inheritance is an implementation fact. The class name must tell callers whether the object registers, stores, resolves, controls, or runs work.
 
@@ -370,7 +370,7 @@ The following debated names stay unchanged because the current scope is accurate
 - Current implemented Agent Notes carry the factual name and path changes. The package-regrouping note records the group inventory and package targets, the SDK removal note reserves `SDK` for the runtime protocol, and the timeout-policy note records the package-name rationale.
 - The paired package-creation guide contains the role-word contract, `packages/AGENTS.md` links to it, the terminology table records the chosen words and `Typert` spelling, and root project prose calls the product DeepSeek Harness rather than DeepSeek Harness SDK.
 - The removed SDK project toolchain stays absent.
-- `pnpm run check:ci` covers source-plane typecheck, build, package hygiene, generated-reference checks, affected snapshots, translation pairing, `doc-sync`, and lint. Release-shaped Python runtime smokes and required CI cover packaged-runtime and platform paths.
+- `pnpm run check:ci` covers source-plane typecheck, build, package hygiene, generated-reference checks, affected snapshots, translation pairing, `doc-sync`, and lint.
 
 ## Consequences
 

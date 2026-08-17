@@ -1,4 +1,4 @@
-# Complete unattended minimal-agent composition for the Python SDK. The model
+# Complete unattended minimal-agent composition driven by the TypeScript SDK client. The model
 # sees one deployment-selected system prompt and only the owner-scoped
 # persistent Bash and string-replace editor tools. Runtime-context injection and
 # context compaction are absent.

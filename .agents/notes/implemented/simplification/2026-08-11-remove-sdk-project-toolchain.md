@@ -8,7 +8,7 @@ The repository carried an unreleased developer-project product with no consumers
 
 No project was created through a public release, and no current repository or external consumer requires that lifecycle. Keeping it meant maintaining four packages, two interactive command products, project templates, package-manager adapters, configuration reconciliation, launcher telemetry, a repository skill, and their tests and documentation without evidence that the product boundary should exist.
 
-The same `scaffold/` group also contained the independently used SDK protocol, TypeScript client, and JSON-RPC server. Those packages serve the Python SDK, the `dsh-sdk` subagent provider, and the JSON-RPC example; their runtime protocol does not depend on generated projects or the removed launcher.
+The same `scaffold/` group also contained the independently used SDK protocol, TypeScript client, and JSON-RPC server. Those packages serve the TypeScript SDK client, the `dsh-sdk` subagent provider, and the JSON-RPC example; their runtime protocol does not depend on generated projects or the removed launcher.
 
 ## Decision
 
@@ -28,9 +28,9 @@ The workspace contains none of the four deleted package names or either removed 
 
 **Keep error-only packages or command aliases.** Rejected because none of the commands shipped publicly. A tombstone would preserve package and executable surface area without a compatibility obligation.
 
-**Delete the runtime SDK stack too.** Rejected because the Python SDK, the out-of-process Harness subagent provider, and the JSON-RPC example are current consumers of the protocol, client, and server.
+**Delete the runtime SDK stack too.** Rejected because the out-of-process Harness subagent provider and the JSON-RPC example are current consumers of the protocol, client, and server.
 
-**Leave the runtime stack under `packages/scaffold/`.** Rejected because nothing left in that group scaffolds a project. `packages/sdk/` states the surviving role directly because `SDK` has one repository meaning: the JSON-RPC client/server protocol used by the supported Python and TypeScript SDKs. DeepSeek Harness itself is not an SDK project.
+**Leave the runtime stack under `packages/scaffold/`.** Rejected because nothing left in that group scaffolds a project. `packages/sdk/` states the surviving role directly because `SDK` has one repository meaning: the JSON-RPC client/server protocol used by the supported TypeScript SDK client. DeepSeek Harness itself is not an SDK project.
 
 ## Consequences
 
