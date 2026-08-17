@@ -1,21 +1,17 @@
 # Contributing
 
-Thank you for your interest in contributing to DeepSeek Harness!
+This repository is a personal working copy of DeepSeek Harness with a single maintainer. Issues and pull requests opened by other people are not monitored here; take them to the upstream project instead.
 
-We deeply believe in the power of open source communities, and that belief has shaped this project from the very beginning.
+## Working agreement
 
-DeepSeek Harness is still at an early stage and under active development. We are sorry that we cannot accept external pull requests at the moment. However, contributing code to this repository is far from the only way to help. There are many other ways to get involved:
+Changes land through a pull request against `main`, never by pushing to `main` directly, so the `all checks passed` verdict on [CI](.github/workflows/ci.yml) gates every merge. Configure `main` as a protected branch requiring that check.
 
-- Identify and report issues or bugs in GitHub Discussions:
-  - Upvote discussions that you would like to bring to the team's attention. We are a very small team and may not be able to reply to every post, but we monitor them and consider them when allocating resources.
-- Contribute to the ecosystem:
-  - Create a plugin that excites you and share it with others:
-    - Associate your GitHub project with the `dsh-plugin` topic to help others discover your plugin.
-  - Write blog posts and how-to guides about DeepSeek Harness.
-  - Answer questions and help other members of the community.
+Before publishing a branch, run the checks that cover the changed surface — [dsh-pre-push-checks](.agents/skills/dsh-pre-push-checks/SKILL.md) selects them; the git hooks in [lefthook.yml](lefthook.yml) are a fast local checkpoint, not a substitute. Dependent branches use GitHub's native stacks per [dsh-merging-stacked-prs](.agents/skills/dsh-merging-stacked-prs/SKILL.md).
 
-DeepSeek Harness is designed to be deeply customizable. We do not believe that packages in the official repository are inherently more important than packages created by the community. You may consider this repository an idea, an official showcase, and a source of inspiration, but not a mandate from us.
+Every non-trivial change carries an Agent Note in the same pull request; [.agents/notes/README.md](.agents/notes/README.md) owns that rule and the file format. [AGENTS.md](AGENTS.md) is the binding work contract for the repository, read together with the nearest `AGENTS.md` above any file you touch.
 
-We have already seen exciting projects emerge from the community, and we hope to see the ecosystem continue to grow in its own directions.
+Labels, milestones, and GitHub Projects are optional here: nothing in CI reads them.
 
-Into the unknown.
+## Ecosystem
+
+Plugins live outside this repository. Associate a plugin project with the `dsh-plugin` GitHub topic so others can discover it.

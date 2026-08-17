@@ -70,8 +70,8 @@ describe('CI workflow', () => {
     ))
     expect(nativeCommandSteps.map(step => step.run)).toContain('pnpm run check:ci:windows-complete')
 
-    // wine-apt-cache: master-only, seeds the Wine apt cache.
-    expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
+    // wine-apt-cache: main-only, seeds the Wine apt cache.
+    expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/main'")
     expect(wineAptCache['runs-on']).toBe('ubuntu-latest')
 
     // No self-hosted pools anywhere: every worker and the verdict job run on
@@ -88,7 +88,7 @@ describe('CI workflow', () => {
     }
   })
 
-  it('exempts push from cancellation, so one master merge does not cancel the running drill', () => {
+  it('exempts push from cancellation, so one main merge does not cancel the running drill', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     if (!isRecord(workflow.jobs) || !isRecord(workflow.concurrency)) {
       throw new TypeError('CI workflow must define jobs and a workflow-level concurrency block')
@@ -101,7 +101,7 @@ describe('CI workflow', () => {
     // any future dispatch event by accident.
     expect(workflow.concurrency['cancel-in-progress']).toBe("${{ github.event_name != 'push' }}")
 
-    // What bounds the cost of exempting push: a master push may only carry the
+    // What bounds the cost of exempting push: a main push may only carry the
     // Wine apt-cache seeder. Any job reachable on push would start accumulating
     // uncancelled runs, so the set is pinned here.
     //
