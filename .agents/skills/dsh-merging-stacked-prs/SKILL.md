@@ -98,7 +98,7 @@ For an explicitly requested partial landing, merge through the boundary PR:
 gh stack merge <boundary-pr> --yes --merge
 ```
 
-The command's flags are `--merge-method` (`merge`, `squash`, or `rebase`), `--merge`, `--squash`, `--rebase`, and `-y/--yes`; there is no `--delete-branch` flag. Do not manually retarget dependents or issue per-PR merge commands. GitHub merges the selected range bottom-up and retargets/rebases any remaining upper layers.
+The command's flags are `--merge-method` (`merge`, `squash`, or `rebase`), `--merge`, `--squash`, `--rebase`, and `-y/--yes`; there is no `--delete-branch` flag. Do not manually retarget dependents or issue per-PR merge commands. GitHub lands the selected range in one operation and retargets/rebases any remaining upper layers. With `--merge`, the whole range produces a single merge commit on the trunk: every PR in the range reports the same `mergeCommit` and each layer's own commits stay in trunk history, so a per-layer merge commit is not the expected outcome.
 
 Before merging, `gh stack merge` checks only that each selected pull request is open and not a draft. GitHub evaluates branch protection and repository rules server-side when the merge runs, and any failure is reported back; they cannot be bypassed. A direct stack merge is all-or-nothing; when the trunk uses a merge queue, the stack is queued, the `--merge-method`, `--merge`, `--squash`, and `--rebase` flags are ignored with a warning, and the selected pull requests may land in separate groups.
 
@@ -112,7 +112,7 @@ Wait for every selected PR to report `MERGED`; a queued request is not a complet
 gh pr view <pr> --json number,state,mergedAt,mergeCommit,baseRefName,headRefName
 ```
 
-For a partial landing, re-query the official stack and verify that every remaining PR is still linked in the expected order and targets the stack trunk or the layer below it. Re-check current heads, review state, and CI because GitHub may have rebased the remaining layers.
+Every PR in a landed range reports the same `mergeCommit`, so a matching OID across layers confirms the range, not a mistake. For a partial landing, re-query the official stack and verify that every remaining PR is still linked in the expected order and targets the stack trunk or the layer below it. Re-check current heads, review state, and CI because GitHub may have rebased the remaining layers.
 
 Delete branches only in a separate final pass after the corresponding PRs report `MERGED`. Before deleting each branch, require GitHub to report no open PR still using it as a base:
 
