@@ -19,7 +19,7 @@ Five regrouping decisions remain current; every other group keeps its prior boun
 
 | Group | Members (folder names) | From |
 |---|---|---|
-| `session/` | session-persistence, session-persistence-jsonl, session-persistence-sqlite, session-checkpoint-policy, session-projection, session-projection-cache, session-title, session-title-llm, session-title-first-prompt-llm, session-title-all-prompts-llm, session-telemetry, session-telemetry-otel | `session-persistence/` + `session-projection/` + `session-title/` + `telemetry/` |
+| `session/` | session-persistence, session-persistence-jsonl, session-persistence-sqlite, session-checkpoint-policy, session-projection, session-projection-cache, session-title, session-title-llm, session-title-first-prompt-llm, session-telemetry, session-telemetry-otel | `session-persistence/` + `session-projection/` + `session-title/` + `telemetry/` |
 | `interaction/` | user-questions, user-approval, permission-presets, tool-ask-user, commands, tui | `ui/` |
 | `boot/` | app-boot | `ui/` |
 | `guard/` | repeat-tool-reminder, timeout-policy | `guard/` + `timeout/` |
@@ -41,7 +41,7 @@ The [repository naming contract](2026-08-11-repository-naming-contract-and-renam
 
 The moves landed as pure `git mv` moves, so rename detection carries the history. A group move touched: the moved package's `tsconfig.json` relative `references` and every dependent's entry (including the `apps/cli` project references), the tsconfig aggregate and path maps, group READMEs, the [packages/README.md](../../../../packages/README.md) hierarchy table, the root `AGENTS.md` layout map, regenerated artifacts (`docs/module-graph.md`, path-embedding catalogs, and the lockfile's importer keys), and root-relative `packages/...` citations in prose and gate scripts. Remaining group-path referents (workspace configs, test globs, lint keys) were found mechanically by the acceptance gates failing loud — the repository's own misconfiguration rule.
 
-A group move did not touch: npm names, imports, `cordis.yml` configs, snapshot fixtures, the `pnpm-workspace.yaml`/`tsdown` globs (both `packages/*/*`), or the Python runtime manifest — all reference packages by npm name.
+A group move did not touch: npm names, imports, `cordis.yml` configs, snapshot fixtures, and the `pnpm-workspace.yaml`/`tsdown` globs (both `packages/*/*`) — all reference packages by npm name.
 
 `client/` and `host/` were out of scope and are unchanged.
 

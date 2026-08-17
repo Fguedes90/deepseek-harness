@@ -244,9 +244,9 @@ Half the sentence was narration; the other half was a load-bearing coupling. Del
 
 ### Dropping provenance while keeping the number
 
-**Original:** "The 4 MiB ceiling is measured: the largest generated `py-types` module is 3.1 MiB."
+**Original:** "The 4 MiB ceiling is measured: the largest generated `tool-catalog` module is 3.1 MiB."
 
-**Overcorrected:** "The ceiling is 4 MiB; the largest generated `py-types` module is 3.1 MiB."
+**Overcorrected:** "The ceiling is 4 MiB; the largest generated `tool-catalog` module is 3.1 MiB."
 
 **Right:** keep "measured".
 

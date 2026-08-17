@@ -15,13 +15,13 @@ The later [Workspace registration deletion decision](../../implemented/feature/2
 
 ## Proposal
 
-Create the `packages/storage/` group — the `ctx.storage` hub (backend registry + data-form mounts), two backends, the domain data form — plus the workspace consumer package; extend `SessionPersistence` with a delete primitive.
+Create the `packages/storage/` group — the `ctx.storage` hub (backend registry + data-form mounts), the json backend (sqlite planned but unbuilt), the domain data form — plus the workspace consumer package; extend `SessionPersistence` with a delete primitive.
 
 | Package | Path | ctx surface | This phase |
 | --- | --- | --- | --- |
 | `@deepseek-ai/dsh-storage` | `packages/storage/storage/` | `ctx.storage` (the hub) | ✓ |
 | `@deepseek-ai/dsh-storage-json` | `packages/storage/storage-json/` | registers backend `json` | ✓ |
-| `@deepseek-ai/dsh-storage-sqlite` | `packages/storage/storage-sqlite/` | registers backend `sqlite` | ✓ |
+| `@deepseek-ai/dsh-storage-sqlite` | `packages/storage/storage-sqlite/` | registers backend `sqlite` | ✗ future work (unbuilt) |
 | `@deepseek-ai/dsh-storage-domain` | `packages/storage/storage-domain/` | mounts `ctx.storage.domain` | ✓ |
 | `@deepseek-ai/dsh-workspace` | `packages/workspace/workspace/` | `ctx.workspaceRegistry` | ✓ |
 | `SessionPersistence.delete` extension + cascade orchestration | `packages/session/session-persistence*` | new method on the existing seam | ✗ future work (session side untouched this phase) |
@@ -29,7 +29,7 @@ Create the `packages/storage/` group — the `ctx.storage` hub (backend registry
 
 (workspace lives in its own group rather than `packages/host/`: the host group's naming rule requires the `dsh-host-*` prefix while this package is named `dsh-workspace`; and the workspace entity is a domain concept, not bound to the host assembly tier. Unrelated to the existing `agent-instructions` package — that is an AGENTS.md instruction loader.)
 
-Dependency direction: `dsh-workspace` → `dsh-domain` → `dsh-storage` ← the two backends. `dsh-workspace` additionally depends on the read-only face of `ctx.sessionPersistence` (attach's cwd check reads the session header; when the service is absent, attach rejects outright — no verification, no bookkeeping). The `ctx.sessions` running-check for session deletion moves into future work together with the cascade.
+Dependency direction: `dsh-workspace` → `dsh-domain` → `dsh-storage` ← the backend(s). `dsh-workspace` additionally depends on the read-only face of `ctx.sessionPersistence` (attach's cwd check reads the session header; when the service is absent, attach rejects outright — no verification, no bookkeeping). The `ctx.sessions` running-check for session deletion moves into future work together with the cascade.
 
 ### `dsh-storage`: the storage hub
 
@@ -69,9 +69,9 @@ Config is `root` only (required, no default, schemastery); apply registers backe
 - Writes: every write primitive = full serialization of the in-memory state → temp write + fsync → atomic rename publish (the Windows variant follows session-persistence-jsonl's win32 path). Memory is authoritative, disk is its projection.
 - `loadAll`: parse the whole file at open; a missing `unit` header, non-object tables, etc. → `malformed-medium`. A missing file = an empty unit, materialized on first write.
 
-### `dsh-storage-sqlite`
+### `dsh-storage-sqlite` (planned, unbuilt)
 
-Config is `path` (required, `':memory:'` allowed) plus `journalMode` (enum, default `wal`); apply mirrors json, registering backend `sqlite`.
+Design stands as specified below; the backend is not currently built. It would register backend `sqlite`, with config `path` (required, `':memory:'` allowed) plus `journalMode` (enum, default `wal`); apply mirrors json, registering backend `sqlite`.
 
 - `node:sqlite` `DatabaseSync`; the open sequence follows session-persistence-sqlite: mkdir 0o700 → `open(path,'wx',0o600)` exclusive create when missing → `PRAGMA foreign_keys=ON` → journal_mode → version check → create tables.
 - Physical layout version `STORAGE_SQLITE_SCHEMA_VERSION = 1` in `PRAGMA user_version`: 0 → stamp; ≠ → `version-mismatch`.
@@ -96,7 +96,7 @@ A single implementation, not abstracted; consumers depend on this layer only and
 ```ts ignore-check
 export const Config = z.object({
   backend: z.string().required(),                // 默认后端名，必填
-  routes: z.dict(z.string()).default({}),        // per-domain 覆盖：{ workspace: 'sqlite' }
+  routes: z.dict(z.string()).default({}),        // per-domain 覆盖：{ workspace: 'json' }
 })
 
 export function apply(ctx: Context, config: Config) {
@@ -262,7 +262,7 @@ The current reuse audit (an account already legible before the migration):
 | --- | --- | --- |
 | JSONL: temp write + fsync + link/unlink atomic publish, 0o700/0o600 permissions, Windows variant (win32.ts) | pure medium | copied by `dsh-storage-json` this phase (whole-file atomic rewrite is the same protocol); becomes the shared implementation at migration |
 | JSONL: line-append, first-line header fast read, zstd per-frame compression | log shape | stays put; moves into the `log` facet at migration |
-| SQLite: openDatabase (mkdir/exclusive create/PRAGMA sequence/user_version check) | pure medium | copied by `dsh-storage-sqlite` this phase — the two openDatabase copies are already near line-identical and this group is the third user; copy now, extract at migration |
+| SQLite: openDatabase (mkdir/exclusive create/PRAGMA sequence/user_version check) | pure medium | to be copied by a rebuilt `dsh-storage-sqlite` (future work) — the two openDatabase copies are already near line-identical and this group would be the third user; copy at reimplementation, extract at migration |
 | SQLite: events/sessions schema, same-transaction materialization | log shape | stays put; moves into the `log` facet at migration |
 | coordinator (per-id write chain, lazy materialization, crash repair, flush barrier) | session semantics | never sinks — event-log domain logic whose counterpart here is the domain layer's write chain; each owns its own |
 | encodeSegment (id-to-path escaping) | medium utility | unused on the domain side (keys never reach paths); sinks together with the `log` facet (one file per session) at migration |
@@ -273,7 +273,7 @@ The current reuse audit (an account already legible before the migration):
 
 | Suite | Coverage | Backends |
 | --- | --- | --- |
-| backend contract (shared suite, written once, run on both) | the seven contract clauses + version rejection + close idempotence | json, sqlite (`:memory:` + temp dirs) |
+| backend contract (shared suite, written once; json now, sqlite when rebuilt) | the seven contract clauses + version rejection + close idempotence | json; sqlite (`:memory:` + temp dirs) when rebuilt |
 | registry/mount | duplicate registration, unmounted access, disposer removal | — |
 | domain layer | the six open steps, schema rejection, update serialization (concurrent interleaving stress), `domain/changed` per record, global initial-value lazy materialization, routing and `facet-unsupported` | either (json) |
 | workspace | create/uniqueness/realpath, attach checks (including rejection when sessionPersistence is absent), the four consistency-doctrine cases | mock domain or json |
@@ -316,7 +316,7 @@ Snapshots: no model-visible or assembly surface this phase, none added; next pha
 
 ## Acceptance criteria
 
-- This phase's four test suites all green: the shared backend contract suite on both json/sqlite, registry/mount disposer semantics, the domain layer (including the six open steps and fail-loud routing), and full workspace semantics (create/attach checks/consistency doctrine).
+- This phase's test suites all green: the shared backend contract suite on json (sqlite when rebuilt), registry/mount disposer semantics, the domain layer (including the six open steps and fail-loud routing), and full workspace semantics (create/attach checks/consistency doctrine).
 - `ctx.workspaceRegistry` completes the create → attach → list → metadata-only delete lifecycle under a test assembly.
 - Zero diff in the session-persistence packages (the acceptance line for not touching the session side this phase).
 - No new snapshots this phase (no model-visible or assembly surface); added next phase with the RPC wiring.

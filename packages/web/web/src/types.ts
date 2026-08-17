@@ -26,8 +26,7 @@ export interface WebSearchRequest {
 
 /**
  * Normalized search outcome. `content` is optional provider-generated answer
- * text or summary (Exa and DeepSeek return none; Perplexity returns a
- * generated answer).
+ * text or summary; the shipped search providers return none today.
  * `sources[]` is the portable citation shape. `truncated` is set by the seam
  * when it cut `sources[]` down to `maxResults`.
  */
@@ -43,8 +42,8 @@ export interface WebSearchResult {
 /**
  * One citeable source. A source always has a URL; `title`, `snippet`, and
  * `publishedAt` are optional because not every provider returns them — forcing
- * adapters to invent them would make the seam lie (Perplexity citations may be
- * URL-only). `dsh-tool-web` renders `title ?? hostname(url)` for display.
+ * adapters to invent them would make the seam lie. `dsh-tool-web` renders
+ * `title ?? hostname(url)` for display.
  */
 export interface WebSearchSource {
   readonly url: string

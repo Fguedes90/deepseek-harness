@@ -353,7 +353,7 @@ export class HarnessClient {
   /**
    * Subscribe to one session and the descendants discovered from
    * `subagent.started` lineage edges (the runtime notifies for every session
-   * in its context; scoping is client-side, mirroring the Python SDK).
+   * in its context; scoping is client-side).
    * @param sessionId - the root session id.
    * @returns the filtered subscription handle.
    */

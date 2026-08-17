@@ -28,7 +28,7 @@ export const SDK_SECTION_ORDER = 150
  * strings share one source of truth. Keyed by `CodeRuntime.language`, mirroring
  * `SDK_RENDERERS` in {@link ./index.ts}. The emitted flavor MUST match the
  * semantics the same language's SDK instructions promise, so the model never
- * receives a TypeScript schema beside a Python SDK (or vice versa).
+ * sees a schema and SDK that disagree on language.
  */
 interface RunCodeFlavor {
   /** The tool `description` the model sees for this language. */
@@ -54,21 +54,6 @@ const TYPESCRIPT_FLAVOR: RunCodeFlavor = {
 }
 
 /**
- * The Python flavor: the body of an async function, top-level `await` and
- * `return`, answer via `print` and/or the returned value, matching
- * {@link ./py-types.ts}'s SDK instructions.
- */
-const PYTHON_FLAVOR: RunCodeFlavor = {
-  description:
-    'Execute a Python program against the available tools. Takes two required '
-    + 'arguments: `code`, the BODY of an async function (top-level `await` and `return` '
-    + 'work), and `description`, a short summary of what the program does. Call tools as '
-    + '`await tools.name(args)` per the declarations in the system prompt. Answer '
-    + 'with `print(...)` and/or `return <value>` — only that comes back, so curate it.',
-  codeDescription: 'The program: the body of an async Python function.',
-}
-
-/**
  * The languages Code Mode ships a presentation for. Both per-language tables —
  * {@link RUN_CODE_FLAVORS} here and `SDK_RENDERERS` in {@link ./index.ts} — are
  * checked against this union with `satisfies`, so a language added to one and
@@ -77,12 +62,11 @@ const PYTHON_FLAVOR: RunCodeFlavor = {
  * is an unconstrained `string`: this union pins what the harness ships, while the
  * `Object.hasOwn` guards reject what a mounted runtime may report.
  */
-export type CodeSdkLanguage = 'typescript' | 'python'
+export type CodeSdkLanguage = 'typescript'
 
 /** Per-language `run_code` schema flavors (see {@link RunCodeFlavor}); one entry per {@link CodeSdkLanguage}. */
 const RUN_CODE_FLAVORS: Record<string, RunCodeFlavor> = {
   typescript: TYPESCRIPT_FLAVOR,
-  python: PYTHON_FLAVOR,
 } satisfies Record<CodeSdkLanguage, RunCodeFlavor>
 
 /**

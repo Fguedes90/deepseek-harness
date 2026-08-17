@@ -8,7 +8,7 @@ The Python and TypeScript SDKs could select a provider and model but could not b
 
 ## Decision
 
-The high-level SDKs expose one optional process-wide output cap: Python names it `max_tokens`, TypeScript names it `maxTokens`, and the shared `initialize` wire payload carries `maxTokens`. The JSON-RPC server rejects values that are not positive safe integers and stores the accepted cap with its provider/model route.
+The high-level SDK exposes one optional process-wide output cap: the TypeScript SDK names it `maxTokens`, and the shared `initialize` wire payload carries `maxTokens`. The JSON-RPC server rejects values that are not positive safe integers and stores the accepted cap with its provider/model route.
 
 Each SDK-created root Agent receives the cap through `AgentOptions.maxTokens`. Agent Loop places that value in the initial `LlmCallConfig`; final call preparation preserves the explicit value or materializes an exact-model adapter default, logs the effective cap in the request header, and reconstructs every dispatched conversation request from that durable header. Omitting the SDK option therefore allows the selected adapter or provider route default to apply.
 

@@ -31,7 +31,7 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   plan/        plan mode as logged state
   preset/      per-session agent composition from preset cordis.yml files
   guard/       loop-hygiene + tool-timeout plugins
-  self-modification/  the agent inspects/mounts its own plugins
+  extensions/  plugin inspection and mounting tools (tool-cordis et al.)
   hooks/       Claude Code/Codex hook bridges + wire-protocol library
   session/     durable session data: persistence, projection, titles, telemetry
   identity/    anonymous identity
@@ -42,8 +42,9 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   boot/        shared app-bin glue
   sdk/         JSON-RPC protocol, server, and TypeScript client
   examples/    demo bundles (agent-spine + CLI/ACP/JSON-RPC bins)
-  support/     dev/test infrastructure
+  test-support/  test-only infrastructure
   util/        zero-dependency utilities
+apps/        shipped products: CLI + web frontend; user-selectable agent presets at apps/cli/config/agent-presets/{standard,minimal,code,cordis}
 native/      @deepseek-ai/node-addon-landlock-run source of record (see native/README.md)
 examples/    Runnable cordis.yml leaves over packages/examples bundles (see examples/AGENTS.md)
 .agents/     Agent workflows and Agent Notes (`notes/`)

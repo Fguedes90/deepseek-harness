@@ -25,7 +25,6 @@ import { createRunCodeTool, RUN_CODE_NAME, SDK_SECTION_ORDER } from './code-mode
 import type { CodeSdkLanguage } from './code-mode.ts'
 import { renderToolsSdk } from './ts-types.ts'
 import type { ToolSdkSchema } from './ts-types.ts'
-import { renderToolsSdkPy } from './py-types.ts'
 
 /**
  * Language → SDK-section renderer. The registry looks up the loaded
@@ -59,7 +58,6 @@ const CODE_ONLY_INSTRUCTION = `\`${RUN_CODE_NAME}\` is the only tool you can cal
 
 const SDK_RENDERERS: Record<string, (schemas: ToolSdkSchema[]) => string> = {
   typescript: renderToolsSdk,
-  python: renderToolsSdkPy,
 } satisfies Record<CodeSdkLanguage, (schemas: ToolSdkSchema[]) => string>
 
 export {
@@ -103,7 +101,6 @@ export type { CodeDispatchEventData, CodeDispatchStartEventData } from './types.
 
 export { CodeRunFailedError, RUN_CODE_NAME } from './code-mode.ts'
 export { jsonSchemaToTs, renderToolsSdk } from './ts-types.ts'
-export { jsonSchemaToPy, renderToolsSdkPy } from './py-types.ts'
 export { defineContentToolFixture, type ContentToolFixtureOptions } from './testing.ts'
 
 // The render-intent vocabulary a tool declares via `presentCall`/`presentResult`
@@ -658,7 +655,7 @@ export interface Config {
    * executor to the same surface (a model-direct call may only name
    * `run_code`; `run_code` SDK sub-dispatches keep every visible tool); `both`
    * sends both forms. Code modes require a `ctx.codeRuntime` whose `language`
-   * has a registered SDK renderer (TypeScript or Python) and fail prompt
+   * has a registered SDK renderer (TypeScript) and fail prompt
    * assembly when it is absent or has no renderer. Under `code`, native names
    * in `toolOrder` are invalid.
    */
