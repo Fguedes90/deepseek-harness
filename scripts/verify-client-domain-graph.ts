@@ -56,13 +56,18 @@ function checkPackage(pkgName: string, clientDir: string): Violation[] {
       // to a client-dir-relative path.
       const fromDir = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : ''
       const parts = (fromDir ? fromDir.split('/') : [])
+      let escaped = false
       for (const seg of spec.split('/')) {
         if (seg === '.') continue
-        if (seg === '..') parts.pop()
-        else parts.push(seg)
+        if (seg === '..') {
+          if (parts.length > 0) parts.pop()
+          else escaped = true // climbed above the client dir (e.g. ../core from a top-level file)
+        } else if (!escaped) {
+          parts.push(seg)
+        }
       }
       const target = parts.join('/')
-      if (target.startsWith('..')) continue // out of client dir (package root) — package-level rules govern
+      if (escaped || parts[0] === '..' || target.startsWith('..')) continue // out of client dir (package root) — package-level rules govern
       const toDomain = domainOf(target)
       if (toDomain === '' || CONTRACT_DIRS.has(toDomain)) continue // top-level shared file or contract layer
       if (fromDomain === toDomain) continue // inside one domain

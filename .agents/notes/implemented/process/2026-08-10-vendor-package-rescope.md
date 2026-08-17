@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-10-vendor-package-rescope.zh.md)
-
 ## Problem
 
 The nine packages under `vendor/` kept their upstream npm names (`cordis`, `cosmokit`, `schemastery`, `@cordisjs/plugin-*`). That premise does not survive publication: every harness package declares `cordis` as a peer dependency, so a consumer installing `@deepseek-ai/dsh-*` must resolve it from the registry, which means publishing the harness publishes this framework layer too. Publishing it under the upstream names squats them on the registry, and where that registry proxies npmjs, the same-name entries shadow the real upstream packages and install the wrong framework into unrelated projects.
@@ -32,11 +30,11 @@ Markdown splits along what a reader does with it. Every fence follows the rename
 
 ## Consequences
 
-- No upstream name remains in the publication set. `publish-npm-baseline.ts` now requires every published package to be `@deepseek-ai/*` with no vendored exemption, so regressing the rename fails before packing.
+- No upstream name remains in the vendored set. `rescope-vendor.ts --check` asserts no residue, so regressing the rename fails the `hygiene` gate before any downstream consumer sees a stale specifier.
 - The `vendor/README.md` manifest table gains an upstream-name column; `gen-third-party-notices` parses six columns and renders that name into `THIRD_PARTY_NOTICES.md`, keeping MIT attribution pointed at each fork's origin rather than our scope.
 - `pnpm-workspace.yaml` drops the `cordis` and `@cordisjs/plugin-loader` `minimumReleaseAgeExclude` entries, which can no longer be fetched from a registry, and `knip.json` drops the `@cordisjs/.+` ignore pattern that `@deepseek-ai/.+` already covers.
 - Upstream sync follows the procedure in `vendor/README.md` with one added obligation in step 3: re-apply the rename over the copied sources with `pnpm run rescope-vendor --apply`, whose mapping and the table's two name columns must agree.
-- **Returning to the official upstream packages** means applying that mapping in reverse — `pnpm run rescope-vendor --apply --reverse` — then restoring the two `minimumReleaseAgeExclude` entries and relaxing the publication-set assertion. It spans roughly 1300 files, so replay it with the script rather than by hand.
+- **Returning to the official upstream packages** means applying that mapping in reverse — `pnpm run rescope-vendor --apply --reverse` — then restoring the two `minimumReleaseAgeExclude` entries. It spans roughly 1300 files, so replay it with the script rather than by hand.
 
 `scripts/rescope-vendor.ts` owns the rename: the mapping, the delimited-token rule, the per-file exemptions where a name is a directory instead of a package, the exact edits above, and a `--check` mode asserting no residue, every exact edit landed, and idempotency, which the `hygiene` gate runs on every CI pass. A rebase replays it instead of resolving a 1300-file conflict, and an upstream change to one of the pinned sites fails the run loudly instead of being silently skipped.
 

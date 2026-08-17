@@ -2,13 +2,11 @@
 
 Status: implemented
 
-English | [中文](2026-08-09-filesystem-absence-observation.zh.md)
-
 ## Problem
 
 The event-gated filesystem policy originally records only successful reads and mutations as a target version. If a session reads a file and an external command deletes it, the first guarded mutation correctly fails stale, but the prescribed reread returns `FS_NOT_FOUND` before emitting `fs/observed`. The old positive version therefore remains forever: write keeps choosing `replaceIfVersion`, the provider keeps rejecting the missing target, and the model-facing “re-read the file, then retry” instruction becomes an unrecoverable loop.
 
-Treating a failed read as permission to create also exposes a second boundary. Both local and E2B providers probe before staging, then historically publish with rename; another process can create the target between those steps and be overwritten even though the caller supplied `createIfAbsent`. An in-process target lock does not protect that cross-process publication race.
+Treating a failed read as permission to create also exposes a second boundary. A provider probes before staging, then historically publishes with rename; another process can create the target between those steps and be overwritten even though the caller supplied `createIfAbsent`. An in-process target lock does not protect that cross-process publication race.
 
 ## Decision
 
@@ -16,7 +14,7 @@ Treating a failed read as permission to create also exposes a second boundary. B
 
 `dsh-fs-observation-policy` stores three logical states per owner and target without injecting or calling `ctx.fs`: missing map entry is unseen, `absent` is confirmed absence, and `present(version)` is a replacement/edit basis. Write maps unseen and absent to the existing `createIfAbsent` intent and present to `replaceIfVersion`. Edit maps unseen to `FS_NOT_OBSERVED`, absent to `FS_NOT_FOUND`, and present to its version guard. A successful create or mutation replaces absence with its produced present version.
 
-Every provider must enforce `createIfAbsent` at the publication point, not only at its initial probe. `dsh-fs-local` stages and fsyncs in a private sibling directory, then hard-links the staged file to the destination; after a failed link it inspects the destination entry so a regular-file collision returns `FS_NOT_OBSERVED`, a non-regular entry returns `FS_NOT_REGULAR_FILE`, and a failure against a still-missing target returns `FS_IO_ERROR`. `dsh-fs-e2b` uses remote `ln -T` with an explicit created/existing result and derives the committed target version from metadata obtained before the non-cancellable commit. Replacements and bare unconditional writes retain their existing publication paths.
+Every provider must enforce `createIfAbsent` at the publication point, not only at its initial probe. `dsh-fs-local` stages and fsyncs in a private sibling directory, then hard-links the staged file to the destination; after a failed link it inspects the destination entry so a regular-file collision returns `FS_NOT_OBSERVED`, a non-regular entry returns `FS_NOT_REGULAR_FILE`, and a failure against a still-missing target returns `FS_IO_ERROR`. Replacements and bare unconditional writes retain their existing publication paths.
 
 This decision does not claim cross-process linearizability for `replaceIfVersion`: the provider version check and replacement remain protected only against writers represented by the provider's own lock and detectable metadata. The narrower guarantee is exact and sufficient for absence recovery: guarded creation never clobbers a target that appears before publication. Local guarded creation requires hard-link support; once any local publication succeeds, staging cleanup is best effort because private residue cannot make the committed write false.
 

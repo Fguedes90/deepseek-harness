@@ -19,6 +19,33 @@ function isUnknownArray(value: unknown): value is unknown[] {
   return Array.isArray(value)
 }
 
+/**
+ * Collect rule name → severity across the top-level rules and every override.
+ * The sensor needs every eslint correctness rule to appear somewhere in the
+ * config (as `error`/`warn` to enable it, or `off` to decline it).
+ */
+function collectRuleSeverities(config: unknown): Map<string, string> {
+  const severities = new Map<string, string>()
+  const scan = (rules: unknown): void => {
+    if (!isRecord(rules)) return
+    for (const [name, setting] of Object.entries(rules)) {
+      if (typeof setting === 'string') {
+        severities.set(name, setting)
+      } else if (isUnknownArray(setting) && typeof setting[0] === 'string') {
+        severities.set(name, setting[0])
+      }
+    }
+  }
+  if (!isRecord(config)) return severities
+  scan(config.rules)
+  if (isUnknownArray(config.overrides)) {
+    for (const override of config.overrides) {
+      if (isRecord(override)) scan(override.rules)
+    }
+  }
+  return severities
+}
+
 function runRepositoryOxlint(args: readonly string[], env: NodeJS.ProcessEnv = {}) {
   return spawnSync(process.execPath, [tsxCli, 'scripts/run-oxlint.ts', ...args], {
     cwd: repositoryRoot,
@@ -42,6 +69,18 @@ function normalizedOutput(result: ReturnType<typeof runOxlint>): string {
 async function writeContractConfig(suffix: string): Promise<string> {
   const path = join(repositoryRoot, `.oxlintrc.contract-${suffix}.json`)
   await writeFile(path, JSON.stringify({ extends: ['./.oxlintrc.json'], ignorePatterns: [] }))
+  return path
+}
+
+// The fix path only replays captured output when the first pass exits 0, so the
+// probe needs a diagnostic the repository reports as an error demoted to a
+// warning here — the channel contract is independent of severity policy.
+async function writeAdvisoryStagedConfig(suffix: string): Promise<string> {
+  const path = join(repositoryRoot, `.oxlintrc.advisory-${suffix}.json`)
+  await writeFile(path, JSON.stringify({
+    extends: ['./.oxlintrc.staged.json'],
+    options: { typeAware: false, reportUnusedDisableDirectives: 'warn' },
+  }))
   return path
 }
 
@@ -244,7 +283,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
       const output = normalizedOutput(result)
 
       expect(result.error).toBeUndefined()
-      expect(result.status, output).toBe(0)
+      expect(result.status, output).toBe(1)
       expect(output).toContain('Unused oxlint-disable directive')
     } finally {
       await Promise.all([
@@ -304,12 +343,13 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
   it('preserves successful fix output channels', async () => {
     const suffix = randomUUID()
     const path = join(repositoryRoot, 'scripts', `staged-lint-probe-${suffix}.ts`)
+    const configPath = await writeAdvisoryStagedConfig(suffix)
 
     try {
       await writeFile(path, '// oxlint-disable-next-line no-console\nexport const value = 1\n')
       const result = runRepositoryOxlint([
         '--config',
-        '.oxlintrc.staged.json',
+        relative(repositoryRoot, configPath),
         '--format',
         'unix',
         '--fix',
@@ -321,7 +361,10 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
       expect(result.stdout).toContain('Unused oxlint-disable directive')
       expect(result.stderr).toBe('')
     } finally {
-      await rm(path, { force: true })
+      await Promise.all([
+        rm(path, { force: true }),
+        rm(configPath, { force: true }),
+      ])
     }
   })
 
@@ -347,6 +390,38 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     } finally {
       await rm(path, { force: true })
     }
+  })
+
+  it('maps every installed eslint correctness rule to enabled or declined', async () => {
+    // Query the installed binary's registered rules. The correctness category
+    // is the contract here: a rule the binary knows about that is neither
+    // enabled (error/warn) nor declined ("off") in .oxlintrc.json was born
+    // silently off and would never fire.
+    const result = runOxlint(['--rules', '--format', 'json'])
+    expect(result.error).toBeUndefined()
+    const rules = JSON.parse(result.stdout) as Array<{
+      scope: string
+      value: string
+      category: string
+    }>
+    const correctnessRules = rules
+      .filter(rule => rule.scope === 'eslint' && rule.category === 'correctness')
+      .map(rule => rule.value)
+      .sort()
+
+    const configPath = join(repositoryRoot, '.oxlintrc.json')
+    const parsed = parseConfigFileTextToJson(configPath, await readFile(configPath, 'utf8'))
+    if (parsed.error !== undefined) {
+      throw new Error(flattenDiagnosticMessageText(parsed.error.messageText, '\n'))
+    }
+    const severities = collectRuleSeverities(parsed.config)
+    const unmapped = correctnessRules.filter(rule => severities.get(rule) === undefined)
+
+    expect(correctnessRules.length).toBeGreaterThan(0)
+    expect(
+      unmapped,
+      `installed eslint correctness rules that are neither enabled nor declined: ${unmapped.join(', ')}`,
+    ).toEqual([])
   })
 
   it.each(['--fix', '--fix-suggestions', '--fix-dangerously'])(

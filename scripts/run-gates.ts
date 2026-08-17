@@ -220,7 +220,6 @@ export function gatesForMode(selected: Mode): Gate[] {
       return nodeCompatGates()
     case 'check-all':
       return [
-        pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
         pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
         pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
         pnpmScript('test', 'test'),
@@ -244,12 +243,17 @@ export function gatesForMode(selected: Mode): Gate[] {
 
 function ciSharedStaticGates(): Gate[] {
   return [
-    pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
     pnpmScript('constraints', 'constraints'),
     pnpmScript('dsh-package-licenses', 'verify-dsh-package-licenses', { label: 'DSH package licenses' }),
     pnpmScript('package-invariants', 'verify-package-invariants', { label: 'package invariants' }),
     pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
     pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
+    // Static hygiene leaves that need no built lib/ tree; wiring them here
+    // (shared by ci-static and the Windows observational lanes) keeps them in
+    // a required PR lane instead of living only in the local check-all.
+    pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
+    pnpmScript('vendored-links', 'verify-vendored-links', { label: 'vendored links' }),
+    pnpmScript('client-domain-graph', 'verify-client-domain-graph', { label: 'client domain graph' }),
   ]
 }
 
@@ -514,6 +518,27 @@ function coverageGates(): Gate[] {
     ], {
       label: 'test:coverage-exempt-heavy',
     }),
+    // Coverage-debt lane: instruments ONLY the measured debt files and enforces
+    // per-file glob thresholds at their locked values (scripts/coverage-debt.ts).
+    // Debt cannot live in the global perFile:100 gate at sub-100 values (a glob
+    // threshold does not exempt a file from it), so it is measured here instead.
+    pnpmExec('coverage-debt', [
+      'vitest',
+      'run',
+      '--coverage',
+      ...workers.instrumented,
+    ], {
+      label: 'coverage-debt',
+      needs: ['coverage'],
+      env: {
+        DSH_COVERAGE_DEBT_LANE: '1',
+        [COVERAGE_EXEMPT_ENV]: '1',
+      },
+    }),
+    pnpmScript('coverage-debt-ratchet', 'verify-coverage-debt', {
+      label: 'coverage-debt ratchet',
+      needs: ['coverage-debt'],
+    }),
   ]
 }
 
@@ -555,6 +580,7 @@ function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
   const artifactOptions = options.artifactNeeds === undefined ? {} : { needs: options.artifactNeeds }
   return [
     pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
+    pnpmScript('vendored-links', 'verify-vendored-links', { label: 'vendored links' }),
     pnpmScript('knip', 'knip'),
     pnpmScript('publint', 'publint', artifactOptions),
     pnpmScript('constraints', 'constraints'),
@@ -603,8 +629,6 @@ function docSyncLeafGates(options: {
     pnpmScript('archived-agent-notes', 'verify-archived-agent-notes', { label: 'archived agent notes' }),
     pnpmScript('type-equivalence', 'verify-type-equiv', { label: 'type equivalence' }),
     pnpmScript('skill-invocation-metadata', 'verify-skill-invocation-metadata', { label: 'skill invocation metadata' }),
-    pnpmScript('translation-prompt', 'verify-translation-prompt', { label: 'translation prompt' }),
-    pnpmScript('translation-pairing', 'verify-translation-pairing', { label: 'translation pairing' }),
     pnpmScript('doc-budgets', 'verify-doc-budgets', { label: 'doc budgets' }),
     pnpmExec('docs-site-projection', ['vitest', 'run', 'scripts/project-doc-site.spec.ts', 'scripts/verify-doc-site-fragments.spec.ts'], {
       label: 'documentation site checks',

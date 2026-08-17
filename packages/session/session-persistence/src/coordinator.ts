@@ -1108,6 +1108,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
           // captured drain AggregateError as the primary failure rather than
           // masking it. Only surface the close error if the drain succeeded.
           /* v8 ignore start -- close failure racing disposal is a defensive teardown edge */
+          // oxlint-disable-next-line no-unsafe-finally -- guarded throw fires only when the primary write succeeded, so nothing is masked
           if (disposeError === undefined) throw closeError
           /* v8 ignore stop */
         }

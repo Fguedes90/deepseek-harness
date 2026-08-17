@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-20-code-mode-typed-tool-returns.zh.md)
-
 ## Problem
 
 Code Mode originally projected each nested tool result back from `ContentBlock[]` into one string. That preserved the human-readable Native presentation but erased the canonical result the tool had already produced: programs had to scrape job ids and dynamic mount ids from prose, structured search and workflow results lost their shape, and non-text blocks became placeholders. The generated SDK could describe arguments but could only promise `Promise<string>` regardless of the tool's real output.
@@ -22,7 +20,7 @@ This note owns the return and failure contract layered on the original [Code Mod
 
 At each prompt assembly the registry projects every visible tool's parameter schema and detached canonical output schema into one deterministic declaration:
 
-```ts ignore-check
+```ts
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 
 interface ToolArgsMap {
@@ -43,6 +41,8 @@ declare class ToolCallError extends Error {
 declare const tools: {
   [K in ToolName]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]>
 }
+
+export {}
 ```
 
 `jsonSchemaToTs()` covers every supported unified-schema node: object, array, string, number, integer, boolean, null, unconstrained JSON, scalar `enum` and `const`, and `oneOf`. Unsupported raw constructs degrade to `unknown` during prompt generation rather than breaking assembly. Tool names retain their exact keys, including names that require quoted access.

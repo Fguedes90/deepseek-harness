@@ -1,7 +1,5 @@
 # `@deepseek-ai/dsh-cmdline`
 
-English | [中文](README.zh.md)
-
 The command line a dsh launcher hands to the app it boots. The launcher parses only its own flags (`--profile`, `--patch`, the config dumps) and hands **everything after them** to the tree verbatim, so an app owns its flag family, its `--help` text, and its parse errors instead of the launcher knowing them.
 
 ## The launcher values
@@ -17,7 +15,7 @@ An embedding host with no command line provides an empty list; that is the hones
 
 Any app plugin may inject `cmdlineArgs`, parse it, and publish an ordinary app-owned service. `parseCmdline(ctx, program)` is only a commander adapter; the program's own action owns validation and the published service:
 
-```ts ignore
+```ts ignore-check
 export const name = 'web-startup'
 export const inject = ['cmdlineArgs']
 

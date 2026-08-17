@@ -1,6 +1,9 @@
-/** Queue contracts derived from the runtime session face and snapshot. */
+/**
+ * Queue contracts derived from the runtime session face and snapshot, plus the
+ * observable read face the input domain overlays onto InputState.queue.
+ */
 import type {
-  ConversationSnapshot, SessionFace,
+  ConversationSnapshot, ObservableSnapshot, SessionFace,
 } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** One address accepted by the runtime session's queue mutation verb. */
@@ -11,3 +14,21 @@ export type QueueAction = Parameters<SessionFace['updateQueue']>[1]
 
 /** One row projected by the runtime session's authoritative queue snapshot. */
 export type QueueRow = ConversationSnapshot['queue'][number]
+
+/** One independently addressable row projected from the transient queue snapshot. */
+export type QueuedMessage = QueueRow
+
+/**
+ * Project a session's transient inbox rows as a bare observable (subscribe/getSnapshot).
+ * The wiring layer overlays this onto InputState.queue; the runtime
+ * QueuedMessage and the input-contract QueuedMessage are structurally
+ * identical.
+ * @param session - the resident session face.
+ * @returns the queue read face (snapshot reference stable while the queue is unchanged).
+ */
+export function queueReadFaceOf(session: SessionFace): ObservableSnapshot<readonly QueuedMessage[]> {
+  return {
+    getSnapshot: () => session.getSnapshot().queue,
+    subscribe: fn => session.subscribe(fn),
+  }
+}

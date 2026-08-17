@@ -321,6 +321,7 @@ export function apply(ctx: Context, config: Config): void {
           await run.dispose()
           if (recordsRun) {
             /* v8 ignore next -- WorkflowRun.result never rejects by contract, so result is assigned before finally. */
+            // oxlint-disable-next-line no-unsafe-finally -- contract guarantees result is set before finally, so no failure is masked
             if (result === undefined) throw new Error('workflow run settled without a result')
             recorder.finish(run.id, result.stopReason)
           }

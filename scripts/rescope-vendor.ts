@@ -69,41 +69,259 @@ interface ExactEdit {
 /**
  * A file where an upstream name also appears as a vendor DIRECTORY name or an
  * upstream runtime identifier: the generic pass is disabled for the listed
- * names and {@link EXACT_EDITS} renames the real package-name occurrences.
+ * names. An entry with no `preserve` list exempts the whole file's pattern
+ * (legacy form); one with a `preserve` list exempts only the lines those
+ * patterns match, so a real package import elsewhere in the file is still
+ * rewritten and reported.
  */
 interface GenericSkip {
   readonly file: string
   readonly upstream: readonly string[]
+  /** Why these names are exempt here, citing the literal token. */
+  readonly reason: string
+  /** Source lines to leave alone, tested against the full original line. */
+  readonly preserve?: readonly RegExp[]
 }
 
 const GENERIC_SKIPS: readonly GenericSkip[] = [
-  // `vendorPackages` lists vendor/ directory names, joined with 'vendor' below it.
-  { file: 'packages/examples/acp-demo/tests/built-bin.e2e.ts', upstream: ['cordis', 'cosmokit', 'schemastery'] },
-  // `Symbol.for('schemastery')` and the `vendor:` metadata field are upstream identifiers.
-  { file: 'vendor/schemastery/src/index.ts', upstream: ['schemastery'] },
-  // Asserts the vendored-manifest table, which gains an upstream-name column.
-  { file: 'scripts/gen-third-party-notices.spec.ts', upstream: RENAMES.map(rename => rename.upstream) },
-  // `cordis` is also an agent-preset id — the directory name under
-  // apps/cli/config/agent-presets/ — so in these files the bare name is
-  // product data, not a package reference. Renaming it changed which preset
-  // the creator flow stages and which id the roster reports.
-  { file: 'packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx', upstream: ['cordis'] },
-  { file: 'packages/client/ui-agent-preset/src/client/index.ts', upstream: ['cordis'] },
-  { file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts', upstream: ['cordis'] },
-  { file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts', upstream: ['cordis'] },
-  { file: 'packages/client/ui-agent-preset/tests/section.client.spec.tsx', upstream: ['cordis'] },
-  { file: 'apps/cli/tests/web-agent-presets.e2e.ts', upstream: ['cordis'] },
-  { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },
-  { file: 'packages/preset/agent-presets/tests/session.spec.ts', upstream: ['cordis'] },
-  // The preset's own composition: its header comment and its system prompt name
-  // the preset a model mounts, so the scoped name would send the model after an
-  // id no roster reports.
-  { file: 'apps/cli/config/agent-presets/cordis/agent.cordis.yml', upstream: ['cordis'] },
-  // The preset-roster loop names the `cordis` preset id, not a package.
-  { file: 'apps/cli/tests/windows-shell.spec.ts', upstream: ['cordis'] },
-  // GROUP_ORDER holds `packages/<group>/` directory names, not package names.
-  { file: 'scripts/gen-module-graph.ts', upstream: ['cordis'] },
-  { file: 'scripts/gen-doc-graphs.ts', upstream: ['cordis'] },
+  {
+    file: 'packages/examples/acp-demo/tests/built-bin.e2e.ts',
+    upstream: ['cordis', 'cosmokit', 'schemastery'],
+    reason: "`vendorPackages` lists vendor/ directory names, joined with 'vendor' below it.",
+  },
+  {
+    file: 'vendor/schemastery/src/index.ts',
+    upstream: ['schemastery'],
+    reason: "`Symbol.for('schemastery')` and the `vendor:` metadata field are upstream identifiers.",
+  },
+  {
+    file: 'scripts/gen-third-party-notices.spec.ts',
+    upstream: RENAMES.map(rename => rename.upstream),
+    reason: 'Asserts the vendored-manifest table, which carries an upstream-name column.',
+  },
+  {
+    file: 'packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id (the directory under apps/cli/config/agent-presets/), product data, not a package reference.",
+  },
+  {
+    file: 'packages/client/ui-agent-preset/src/client/index.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id, not a package reference.",
+  },
+  {
+    file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id here; the real framework import in the file is an EXACT_EDIT.",
+  },
+  {
+    file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id here, asserted verbatim by a POSTCONDITION.",
+  },
+  {
+    file: 'packages/client/ui-agent-preset/tests/section.client.spec.tsx',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id, not a package reference.",
+  },
+  {
+    file: 'apps/cli/tests/web-agent-presets.e2e.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id here; the real framework import in the file is an EXACT_EDIT.",
+  },
+  {
+    file: 'apps/web/tests/agent-preset-authoring.e2e.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id, not a package reference.",
+  },
+  {
+    file: 'packages/preset/agent-presets/tests/session.spec.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is an agent-preset id, not a package reference.",
+  },
+  {
+    file: 'apps/cli/config/agent-presets/cordis/agent.cordis.yml',
+    upstream: ['cordis'],
+    reason: "'cordis' names the preset a model mounts; the scoped name would send the model after an id no roster reports.",
+  },
+  {
+    file: 'apps/cli/tests/windows-shell.spec.ts',
+    upstream: ['cordis'],
+    reason: "'cordis' is the preset-roster loop's preset id, not a package reference.",
+  },
+  {
+    file: 'scripts/gen-module-graph.ts',
+    upstream: ['cordis'],
+    reason: 'GROUP_ORDER holds `packages/<group>/` directory names, not package names.',
+  },
+  {
+    file: 'scripts/gen-doc-graphs.ts',
+    upstream: ['cordis'],
+    reason: 'GROUP_ORDER holds `packages/<group>/` directory names, not package names.',
+  },
+  // From here: `cordis` is the self-modification feature's name. The event
+  // channels it defines are `cordis/<event>` (dynamic-package, dynamic-retract,
+  // inspect-query, inspect-query-resolved, request-run, request-run-resolved) —
+  // runtime identifiers, never npm specifiers — so the whole-file pattern is
+  // exempted only on lines that carry one of those channel tokens. A bare
+  // `'cordis'` import anywhere else is still a residue.
+  {
+    file: 'docs/event-producer-consumer.md',
+    upstream: ['cordis'],
+    reason: 'Prose table documents the runtime event channels such as `cordis/dynamic-package` and `cordis/request-run`, which are feature identifiers, not packages.',
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'docs/subsystems/extensions.md',
+    upstream: ['cordis'],
+    reason: "Documents the runtime event channels (`'cordis/dynamic-package'`, `cordis/*`), feature identifiers, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/api/remotes/src/remote-events.ts',
+    upstream: ['cordis'],
+    reason: "Lists the runtime event channels ('cordis/dynamic-package', 'cordis/request-run-resolved'), feature identifiers, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx',
+    upstream: ['cordis'],
+    reason: "t('cordis') is the UI translation namespace id, not a package.",
+    preserve: [/t\('cordis'\)/],
+  },
+  {
+    file: 'packages/extensions/cordis-client-runner/src/client/index.ts',
+    upstream: ['cordis'],
+    reason: "ctx.remote.$on('cordis/dynamic-retract') and the other event channels are runtime identifiers, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-client-runner/src/client/runtime.ts',
+    upstream: ['cordis'],
+    reason: 'Doc comment names the runtime event channel `cordis/dynamic-retract`, a feature identifier.',
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-client-runner/tests/orchestrator.client.spec.ts',
+    upstream: ['cordis'],
+    reason: 'Comment names the runtime event channel `cordis/request-run`, a feature identifier.',
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-client-runner/tests/plugin.client.spec.ts',
+    upstream: ['cordis'],
+    reason: "forward(bench.ctx, 'cordis/request-run', …) names runtime event channels, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-host-runner/src/index.ts',
+    upstream: ['cordis'],
+    reason: "this.ctx.emit('cordis/dynamic-package', …) names runtime event channels, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-host-runner/src/inspect-registry.ts',
+    upstream: ['cordis'],
+    reason: "this.ctx.emit('cordis/inspect-query', …) names runtime event channels, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-host-runner/src/types.ts',
+    upstream: ['cordis'],
+    reason: "'cordis/dynamic-package'(pkg: …) declares runtime event-channel signatures, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-host-runner/tests/helpers.ts',
+    upstream: ['cordis'],
+    reason: "['cordis/request-run', …] names runtime event channels in fixture events, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-host-runner/tests/runner.spec.ts',
+    upstream: ['cordis'],
+    reason: "['cordis/dynamic-package', 'cordis/request-run', …] asserts runtime event channels, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/cordis-host-runner/tests/versioning.spec.ts',
+    upstream: ['cordis'],
+    reason: "event === 'cordis/request-run' matches a runtime event channel, not a package.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/tool-cordis/src/api-catalog.ts',
+    upstream: ['cordis'],
+    reason: "name: 'cordis/dynamic-package' and the signature strings catalog runtime event channels, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/tool-cordis/src/providers.ts',
+    upstream: ['cordis'],
+    reason: "event.name.startsWith('cordis/') filters runtime event channels, not packages.",
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/CordisActionRow.tsx',
+    upstream: ['cordis'],
+    reason: "PropsLocale<'cordis'> is the UI translation namespace id, not a package.",
+    preserve: [/PropsLocale<'cordis'>/],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/CordisDefineRow.tsx',
+    upstream: ['cordis'],
+    reason: "PropsLocale<'cordis'> is the UI translation namespace id, not a package.",
+    preserve: [/PropsLocale<'cordis'>/],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/CordisPanel.tsx',
+    upstream: ['cordis'],
+    reason: "PropsLocale<'cordis'> is the UI translation namespace id, not a package.",
+    preserve: [/PropsLocale<'cordis'>/],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/CordisRunRow.tsx',
+    upstream: ['cordis'],
+    reason: "PropsLocale<'cordis'> is the UI translation namespace id, not a package.",
+    preserve: [/PropsLocale<'cordis'>/],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/index.ts',
+    upstream: ['cordis'],
+    reason: "name: 'cordis' is the plugin id and the $on calls name runtime event channels (cordis/dynamic-package, …), not packages.",
+    preserve: [/name: 'cordis'/, /cordis\//],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/inventory.ts',
+    upstream: ['cordis'],
+    reason: 'Doc comment names runtime event channels `cordis/dynamic-package` / `/retract`, not packages.',
+    preserve: [/cordis\//],
+  },
+  {
+    file: 'packages/extensions/ui-cordis/src/client/locales.ts',
+    upstream: ['cordis'],
+    reason: "export const NS = 'cordis' is the UI translation namespace id, not a package.",
+    preserve: [/NS = 'cordis'/],
+  },
+  {
+    file: 'scripts/gen-cordis-catalog.ts',
+    upstream: ['cordis'],
+    reason: "'cordis': 'extensions.md' maps the feature id to its doc page; a catalog key, not a package.",
+    preserve: [/^  'cordis': /],
+  },
+  {
+    file: 'scripts/vendor-fork.ts',
+    upstream: ['cordis', 'cosmokit', 'schemastery'],
+    reason: "The fork table maps both sides of the name mapping: `{ dir: 'cordis', clone: 'cordis', … }` and `cordis: join(CLONE_ROOT, 'cordis')` are clone-directory names, not imports.",
+    preserve: [
+      /cordis: join\(CLONE_ROOT, 'cordis'\)/,
+      /clone: 'cordis'/,
+      /cosmokit: join\(CLONE_ROOT, 'cosmokit'\)/,
+      /clone: 'cosmokit'/,
+      /schemastery: join\(CLONE_ROOT, 'schemastery'\)/,
+      /clone: 'schemastery'/,
+    ],
+  },
 ]
 
 /** A string that must appear exactly `count` times once the rescope has run. */
@@ -212,19 +430,10 @@ const EXACT_EDITS: readonly ExactEdit[] = [
     expect: 1,
   },
   {
-    id: 'publication-set-scope-assertion',
-    file: 'scripts/publish-npm-baseline.ts',
-    find: '      if (!isVendored && !name.startsWith(\'@deepseek-ai/\')) {',
-    replace: `      // Vendored packages are rescoped too (vendor/README.md), so publication
-      // never carries an upstream name that would squat it on the registry.
-      if (!name.startsWith('@deepseek-ai/')) {`,
-    expect: 1,
-  },
-  {
     id: 'vendor-readme-preamble',
     file: 'vendor/README.md',
-    find: 'All vendored packages keep their **original npm names** and are marked `private: true` — they are never published from this repo. `pnpm-workspace.yaml#linkWorkspacePackages` makes matching upstream semver ranges resolve these pinned workspaces, including imports from built `lib/`; disabling it substitutes npm copies behind the same names.',
-    replace: 'All vendored packages are **renamed into the `@deepseek-ai` scope** (`cordis` → `@deepseek-ai/cordis`, `@cordisjs/plugin-<x>` → `@deepseek-ai/cordis-plugin-<x>`): every harness package declares `cordis` as a peer dependency, so publishing the harness publishes this framework layer too, and a publication under the upstream names would squat them on the registry. Directory names and upstream version numbers are deliberately unchanged, so the manifest below still reads as an upstream snapshot. `pnpm-workspace.yaml#linkWorkspacePackages` makes those preserved semver ranges resolve these pinned workspaces, including imports from built `lib/`.',
+    find: 'All vendored packages keep their **original npm names** and are marked `private: true` — they are never published from this repo. Directory names are deliberately unchanged; the manifest\'s `Version` column records the **upstream baseline** version at the pinned commit, while each vendored `package.json` carries its own harness release version ahead of it (log entry 21). `pnpm-workspace.yaml#linkWorkspacePackages` makes matching upstream semver ranges resolve these pinned workspaces, including imports from built `lib/`; disabling it substitutes npm copies behind the same names.',
+    replace: 'All vendored packages are **renamed into the `@deepseek-ai` scope** (`cordis` → `@deepseek-ai/cordis`, `@cordisjs/plugin-<x>` → `@deepseek-ai/cordis-plugin-<x>`): every harness package declares `cordis` as a peer dependency, so publishing the harness publishes this framework layer too, and a publication under the upstream names would squat them on the registry. Directory names are deliberately unchanged; the manifest\'s `Version` column records the **upstream baseline** version at the pinned commit, while each vendored `package.json` carries its own harness release version ahead of it (log entry 21). `pnpm-workspace.yaml#linkWorkspacePackages` makes the preserved semver ranges resolve these pinned workspaces, including imports from built `lib/`.',
     expect: 1,
   },
   {
@@ -245,13 +454,6 @@ const EXACT_EDITS: readonly ExactEdit[] = [
     // A plain fence listing the bundle's mounted tree: a bare token, no quotes.
     id: 'agent-spine-demo-mounted-tree',
     file: 'packages/examples/agent-spine-demo/README.md',
-    find: '@cordisjs/plugin-timer            timer service',
-    replace: '@deepseek-ai/cordis-plugin-timer  timer service',
-    expect: 1,
-  },
-  {
-    id: 'agent-spine-demo-mounted-tree-zh',
-    file: 'packages/examples/agent-spine-demo/README.zh.md',
     find: '@cordisjs/plugin-timer            timer service',
     replace: '@deepseek-ai/cordis-plugin-timer  timer service',
     expect: 1,
@@ -301,25 +503,11 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
     expect: 1,
   },
   {
-    id: 'vendoring-cookbook-tree-comment-zh',
-    file: 'docs/cookbook/adding-a-vendored-package.zh.md',
-    find: '  package.json     # from upstream; set "private": true, keep name/exports/type',
-    replace: '  package.json     # from upstream; set "private": true, rescope the name, keep exports/type',
-    expect: 1,
-  },
-  {
     // The checklist told the next vendoring to keep upstream's name.
     id: 'vendoring-cookbook-name-invariant',
     file: 'docs/cookbook/adding-a-vendored-package.md',
     find: "keep upstream's `name`/`version`/`exports`/`type`",
     replace: "rescope the `name` ([mapping](../rescope.md)) while keeping upstream's `version`/`exports`/`type`",
-    expect: 1,
-  },
-  {
-    id: 'vendoring-cookbook-name-invariant-zh',
-    file: 'docs/cookbook/adding-a-vendored-package.zh.md',
-    find: '保留上游的 `name`/`version`/`exports`/`type`',
-    replace: '改写 `name` 的 scope（[映射](../rescope.md)），保留上游的 `version`/`exports`/`type`',
     expect: 1,
   },
   {
@@ -468,8 +656,7 @@ function excluded(file: string): boolean {
   // sources on disk — including the notes this rescope leaves alone.
   if (file.startsWith('scripts/snapshots/')) return true
   // The mapping documents state both names on purpose.
-  if (file === 'docs/rescope.md' || file === 'docs/rescope.zh.md') return true
-  if (file.endsWith('.i18n.yaml')) return true // blob-hash records, re-recorded by the pairing gate
+  if (file === 'docs/rescope.md') return true
   if (file === 'pnpm-lock.yaml') return true // regenerated by pnpm install
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true // upstream files kept verbatim
   return !EXTENSIONS.some(extension => file.endsWith(extension))
@@ -503,14 +690,30 @@ function patterns(reverse: boolean): Pattern[] {
     }))
 }
 
-function skipped(file: string, pattern: Pattern): boolean {
-  return GENERIC_SKIPS.some(skip => skip.file === file && skip.upstream.includes(pattern.upstream))
+/**
+ * Whether one source line is exempt from `pattern`'s rewrite in `file`.
+ *
+ * An entry with no {@link GenericSkip.preserve} list exempts the whole file's
+ * pattern (legacy form: every upstream occurrence on that file is domain data).
+ * An entry with a `preserve` list exempts only the lines its patterns match, so
+ * a real package import anywhere else in the file is still rewritten and
+ * reported — the exception is per-token, not per-file.
+ * @param line - The original, pre-rewrite source line.
+ * @param file - Repository-relative path, as {@link GENERIC_SKIPS} sees it.
+ * @param pattern - The name pattern about to rewrite this line.
+ * @returns True when the line's occurrences of `pattern` are domain data.
+ */
+function skipLine(line: string, file: string, pattern: Pattern): boolean {
+  const skip = GENERIC_SKIPS.find(candidate => candidate.file === file && candidate.upstream.includes(pattern.upstream))
+  if (skip === undefined) return false
+  if (skip.preserve === undefined || skip.preserve.length === 0) return true
+  return skip.preserve.some(rule => rule.test(line))
 }
 
 function rewriteLine(line: string, file: string, all: readonly Pattern[]): string {
   let out = line
   for (const pattern of all) {
-    if (skipped(file, pattern)) continue
+    if (skipLine(line, file, pattern)) continue
     out = out.replace(pattern.token, (_match, quote: string, subpath: string) => `${quote}${pattern.to}${subpath}${quote}`)
     out = out.replace(pattern.yamlName, (_match, prefix: string, suffix: string) => `${prefix}${pattern.to}${suffix}`)
   }
@@ -590,6 +793,25 @@ export function exactEditState(text: string, find: string, replace: string, expe
   }
   if (hits === 0 && landed === expect) return 'applied'
   return hits === expect && landed === 0 ? 'pending' : 'invalid'
+}
+
+/**
+ * Rewrite one file's text through the name mapping in one direction, running
+ * the same generic pass the CLI applies for that file. Reverse is the
+ * fork-projection direction (scoped -> upstream) that `vendor-fork export`
+ * uses; forward is the repository direction (upstream -> scoped) that
+ * `vendor-fork import` uses. Callers pass the repository-relative path so the
+ * generic-skips and Markdown fence rules match the tree the CLI would rewrite.
+ * @param file - Repository-relative path, as `excluded()` and
+ *   {@link GENERIC_SKIPS} see it; only the generic pass behavior for that path
+ *   is consulted, the file is not read or written here.
+ * @param text - The complete current text of the file.
+ * @param reverse - True to undo the rescope (scoped -> upstream), false to
+ *   apply it (upstream -> scoped).
+ * @returns The rewritten text and the number of lines it changed.
+ */
+export function rewriteRescopeText(file: string, text: string, reverse: boolean): { text: string; lines: number } {
+  return rewrite(text, file, patterns(reverse))
 }
 
 function main(): void {
@@ -680,7 +902,7 @@ function main(): void {
   } else if (mode === 'check') {
     console.log('rescope-vendor: post-state verified — no residue, every exact edit landed, idempotent.')
   } else if (mode === 'apply') {
-    console.log('rescope-vendor: applied. Run `pnpm install`, `pnpm run gen-third-party-notices`, and re-record the touched bilingual pairs.')
+    console.log('rescope-vendor: applied. Run `pnpm install` and `pnpm run gen-third-party-notices`.')
   }
 }
 

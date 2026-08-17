@@ -1,8 +1,7 @@
 /**
  * Typecheck Markdown `ts` fences against the workspace API. `ignore-check` fences are reported as
  * opt-outs; generated catalog fragments and source-equivalence blocks are skipped here because their
- * owning gates verify them. Byte-identical `.zh.md` copies reuse their unsuffixed sibling's check. A
- * build-coordinated mode consumes existing declarations without emit.
+ * owning gates verify them. A build-coordinated mode consumes existing declarations without emit.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -11,10 +10,19 @@ import { join, relative, resolve } from 'node:path'
 import ts from 'typescript'
 import { builtDeclarationPath } from './doc-typecheck-paths.ts'
 import { markdownFences } from './markdown.ts'
-import { partitionPairedMarkdownDerivatives } from './paired-markdown-derivatives.ts'
 import { isArchivedAgentNotePath } from './repo-files.ts'
 
 const root = resolve(import.meta.dirname, '..')
+
+/**
+ * Opt-out ceiling for `ts ignore-check` fences. Follows the doc-budgets ratchet
+ * contract (scripts/doc-budgets.manifest.json, docs/AGENTS.md#wordcount-budgets):
+ * the count must equal the ceiling — exceeding it demands making blocks compile,
+ * dropping below it demands lowering the ceiling in the same change — so the
+ * opt-out number only ever shrinks. Raise only with justification; a stale
+ * ceiling is a budget bug.
+ */
+const IGNORE_CEILING = 76
 
 /**
  * TypeScript-fence ownership. `check` compiles; `ignore` is an unchecked sketch
@@ -43,6 +51,36 @@ const KIND_BY_INFO: Record<string, BlockKind> = {
   'ts config-catalog': 'config-catalog',
 }
 
+/**
+ * Non-TypeScript info-strings the gate accepts without compiling: a bare fence
+ * (no language is not a misspelled one) plus other languages the gate never
+ * type-checks. Anything outside `KIND_BY_INFO` and this allowlist fails the
+ * gate naming its file and line, so a new or misspelled fence needs an explicit
+ * decision instead of silent skipping. Canonical spellings only: `markdown`
+ * (not `md`) and `ts` (not `typescript`) — those spellings are deliberately
+ * absent so re-introducing them is caught.
+ */
+const ALLOWED_UNCHECKED_LANG: Record<string, true> = {
+  '': true,
+  yaml: true,
+  json: true,
+  jsonc: true,
+  markdown: true,
+  text: true,
+  sh: true,
+  js: true,
+  mermaid: true,
+  toml: true,
+  sql: true,
+}
+
+/** A fence whose info-string the gate neither compiles nor explicitly allows. */
+interface UnrecognizedFence {
+  file: string
+  line: number
+  info: string
+}
+
 /** Extract every recognized TypeScript fence from one Markdown file. */
 function extractBlocks(absPath: string): Block[] {
   const file = relative(root, absPath)
@@ -50,6 +88,16 @@ function extractBlocks(absPath: string): Block[] {
     const kind = KIND_BY_INFO[fence.info]
     return kind === undefined ? [] : [{ file, line: fence.line, kind, code: fence.code }]
   })
+}
+
+/** Fences the gate neither recognizes as TypeScript nor allowlists, so it can reject them. */
+function unrecognizedFences(absPath: string): UnrecognizedFence[] {
+  const file = relative(root, absPath)
+  return markdownFences(readFileSync(absPath, 'utf8')).flatMap(fence =>
+    KIND_BY_INFO[fence.info] === undefined && ALLOWED_UNCHECKED_LANG[fence.info] !== true
+      ? [{ file, line: fence.line, info: fence.info }]
+      : [],
+  )
 }
 
 const configHost: ts.ParseConfigFileHost = {
@@ -212,12 +260,18 @@ for (const pattern of markdownGlobs) {
 }
 files.sort()
 
+const unrecognized = files.flatMap(unrecognizedFences)
+if (unrecognized.length > 0) {
+  console.error('doc-typecheck: unrecognized fence info-string(s) — use a compiled `ts` variant or an allowlisted language, or add a deliberate allowlist entry:\n')
+  for (const fence of unrecognized) {
+    console.error(`  ${fence.file}:${fence.line} (info-string ${JSON.stringify(fence.info)})`)
+  }
+  console.error('\nAllowlisted unchecked languages: yaml, json, jsonc, markdown, text, sh, js, mermaid, toml, sql (a bare fence is an unlabelled block, not an error).')
+  process.exit(1)
+}
+
 const extracted = files.flatMap(extractBlocks)
-const { primary: all, derivatives } = partitionPairedMarkdownDerivatives(
-  extracted,
-  block => block.file,
-  block => `${block.kind}\0${block.code}`,
-)
+const all = extracted
 const checked = all.filter(b => b.kind === 'check')
 const ignored = all.filter(b => b.kind === 'ignore')
 // Only compile-eligible fences belong in the opt-out ratio; every other skipped
@@ -244,8 +298,20 @@ if (compilationError !== undefined) {
 
 const ratio = ignored.length / ratioDenominator
 const skipped = all.length - ratioDenominator
-console.log(`doc-typecheck: ${checked.length} block(s) compiled, ${ignored.length} ignored (${(ratio * 100).toFixed(0)}% opt-out), ${skipped} type-equiv/catalog (checked elsewhere), ${derivatives.length} paired derivative(s).`)
-// Guard against the escape hatch becoming the norm.
+console.log(`doc-typecheck: ${checked.length} block(s) compiled, ${ignored.length} ignored (${(ratio * 100).toFixed(0)}% opt-out, ceiling ${IGNORE_CEILING}), ${skipped} type-equiv/catalog (checked elsewhere).`)
+
+// The ignore-check count must equal the ceiling: exceeding it demands making
+// blocks compile, dropping below it demands lowering the ceiling here, so the
+// opt-out number only ever shrinks instead of accruing as credit.
+if (ignored.length > IGNORE_CEILING) {
+  console.error(`doc-typecheck: ${ignored.length} ts ignore-check blocks exceed the ${IGNORE_CEILING}-block ceiling. Make ${ignored.length - IGNORE_CEILING} of them compile (convert to \`ts\` and fix what keeps them sketches) or delete them; to accept the opt-out instead, raise IGNORE_CEILING with justification.`)
+  process.exit(1)
+}
+if (ignored.length < IGNORE_CEILING) {
+  console.error(`doc-typecheck: ${ignored.length} ts ignore-check blocks are below the ${IGNORE_CEILING}-block ceiling. Lower IGNORE_CEILING to ${ignored.length} in the same change so the opt-out number can only shrink.`)
+  process.exit(1)
+}
+// Guard against the escape hatch becoming the norm even at the ceiling.
 if (ratioDenominator >= 4 && ratio > 0.5) {
   console.error(`doc-typecheck: too many blocks opt out of checking (${ignored.length}/${ratioDenominator}). Make them compile or delete them.`)
   process.exit(1)

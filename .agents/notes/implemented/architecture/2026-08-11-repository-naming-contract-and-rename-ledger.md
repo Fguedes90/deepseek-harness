@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-11-repository-naming-contract-and-rename-ledger.zh.md)
-
 ## Problem
 
 The repository had grown faster than some names. Several package names described the first implementation instead of the capability. Several classes used `Service` even when they were registries, runtimes, engines, controllers, or resolvers. Some `ctx` keys were singular for registries and plural for one engine. Some provider names said `local` even though they used replaceable filesystem or subprocess services and could run in another execution world.
@@ -265,13 +263,12 @@ Keep `@deepseek-ai/dsh-subagent-dsh-sdk`, its provider id `dsh-sdk`, external AC
 
 Keep MCP, Todo, and the Plan Mode package, key, events, and tool names. This decision renames the controller class, not the product feature.
 
-### Utilities, E2B, host, bundles, examples, and applications
+### Utilities, host, bundles, examples, and applications
 
 | Former | Current | Reason |
 |---|---|---|
 | `util/paths/`, `@deepseek-ai/dsh-paths` | `util/home-paths/`, `@deepseek-ai/dsh-home-paths` | The helpers resolve paths under the Harness home. They are not a general path library. Keep the individual function names when they already state the returned path. |
 | `util/retention/`, `@deepseek-ai/dsh-retention` | `util/output-retention/`, `@deepseek-ai/dsh-output-retention` | The policy retains command and tool output. It is not a general data-retention framework. |
-| `E2BSandboxService` | `E2BRuntime` | The class creates, reuses, and disposes the E2B execution environment used by filesystem and subprocess adapters. It is broader than one sandbox handle and narrower than a generic owner. Keep `@deepseek-ai/dsh-e2b`, `ctx.e2b`, and the `e2b/` group. |
 | `@deepseek-ai/dsh-frontend-static` | `@deepseek-ai/dsh-host-frontend-static` | The package is the Host plugin that serves the frontend assets. The prefix distinguishes it from frontend application code. |
 | `PluginInventoryService` | `PluginInventoryGateway` | The class is a Remote-only adapter from the live Loader tree to the `pluginInventory/list` RPC. It owns no same-process service, cache, history, or mutation path. `Gateway` states the role that exists. |
 | `@deepseek-ai/dsh-jsonrpc-demo` | `@deepseek-ai/dsh-sdk-jsonrpc-demo` | The example demonstrates the runtime SDK over JSON-RPC. It belongs to the one SDK meaning. |

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-11-web-attachment-display-alignment.zh.md)
-
 ## Problem
 
 The web composer's image surfaces missed basic usability (user feedback, issue #2248). The remove control hung outside each 72px thumbnail at `top/right: -6px`, so the rail's `overflow-x` box clipped it and clicks aimed at it often missed; previews opened only on double-click, an affordance nothing advertised except a tooltip; a rail wider than the composer produced a raw horizontal scrollbar inside the capsule; and image-intake rejections plus prompt failures (for example `attachment-error` when the selected model takes no image input) rendered as persistent inline red strips above the card. Every one of these surfaces already has a settled design in DeepSeek Chat that users know: single-click preview, an inside-the-card hover-revealed remove control, hidden-scrollbar arrow paging, and a transient top-center toast.
@@ -30,4 +28,4 @@ Both overlays body-portal: the lightbox opened from a chat message sits under tr
 
 ## Consequences
 
-The composer and history image surfaces now match DeepSeek Chat's interaction model, and the label-prop seam means the atoms render under any locale without reaching for one. The cost is a real package boundary: `ui-attachment` carries the standard scaffolding (invariant companion, bilingual README, tsconfig face, per-file 100% coverage) and item strings must be resolved by every future consumer rather than inherited. Error banners are now transient — a user who looks away for four seconds misses the message, the trade DeepSeek Chat itself makes. Non-image attachments remain unsupported; the rail's card model is ready for them but the composer's intake is image-only (tracked in the package README's limitations).
+The composer and history image surfaces now match DeepSeek Chat's interaction model, and the label-prop seam means the atoms render under any locale without reaching for one. The cost is a real package boundary: `ui-attachment` carries the standard scaffolding (invariant companion, README, tsconfig face, per-file 100% coverage) and item strings must be resolved by every future consumer rather than inherited. Error banners are now transient — a user who looks away for four seconds misses the message, the trade DeepSeek Chat itself makes. Non-image attachments remain unsupported; the rail's card model is ready for them but the composer's intake is image-only (tracked in the package README's limitations).

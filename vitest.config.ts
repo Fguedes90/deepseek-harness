@@ -5,6 +5,13 @@ import { resolvePwshPath } from './packages/shell/pwsh-local/src/resolve.ts'
 import { defineConfig } from 'vitest/config'
 import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
+import { coverageDebt, coverageDebtGlobs } from './scripts/coverage-debt.ts'
+
+// The coverage-debt lane instruments ONLY the debt files, so they are measured
+// and locked (per-file glob thresholds at their real values) without ever
+// entering the main gate's global perFile:100 — a glob threshold does NOT
+// exempt a file from the global threshold (verified empirically in vitest 4).
+const debtLane = process.env.DSH_COVERAGE_DEBT_LANE === '1'
 
 // Prints exact `path:line:col` records for every uncovered statement, branch
 // path, and function when a file misses the per-file 100% gate — the built-in
@@ -163,104 +170,33 @@ export default defineConfig({
       // executable code; vendor/ and examples/ are out of scope (examples are
       // exercised by the demo smoke test instead).
       // .tsx: client components are gated like everything else (jsdom lane).
-      include: ['packages/*/*/src/**/*.{ts,tsx}'],
+      include: debtLane ? [...coverageDebtGlobs] : ['packages/*/*/src/**/*.{ts,tsx}'],
       // Types-only files have no runtime coverage. Importing self-executing bins/workers would boot
       // them inside the unit process, so real subprocess/Worker tests cover their thin entry glue.
+      // The main gate's global perFile:100 is the ONLY standard: a glob threshold does NOT exempt
+      // a file from it (verified empirically), so debt files cannot live in this gate at sub-100
+      // values. Every debt glob is excluded here and instead measured+locked by the coverage-debt
+      // lane (DSH_COVERAGE_DEBT_LANE=1) + verify-coverage-debt.ts ratchet — the debt is tracked,
+      // not invisible.
       exclude: [
         'packages/*/*/src/types.ts',
         'packages/*/*/src/bin.ts',
         'packages/*/*/src/worker.ts',
-        // Dynamic Host/Client composition is covered by its focused lifecycle
-        // tests and assembled application checks rather than per-file coverage.
-        'packages/self-modification/*/src/**/*.{ts,tsx}',
         // A killed executable lint-contract test can leave a non-product source probe behind.
         'packages/*/*/src/oxlint-contract-*.ts',
-        // Client/web UI files whose remaining branches need a browser-grade
-        // harness the jsdom lane doesn't cover yet. TODO(gui): cover and
-        // remove as the client test lane matures.
-        'packages/client/ui-trajectory/src/*',
-        // Trajectory's compact Markdown projection retains deferred branch coverage.
-        'packages/client/ui-primitives/src/markdown/plain-text.ts',
-        'packages/client/ui-user-questions/src/client/QuestionComposer.tsx',
-        'packages/client/ui-primitives/src/Menu.tsx',
-        'packages/client/ui-primitives/src/RiskConfirmation.tsx',
-        'packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx',
-        'packages/client/ui-workspace/src/client/WorkspacePicker.tsx',
-        'packages/client/web-react/src/*',
-        // This isolated settings-scope lifecycle has complete unit coverage;
-        // keep it out of the broader client-runtime GUI debt exemption.
-        'packages/client/runtime/src/**/!(settings-scope).ts',
-        // Keep the browser conversation tree under its existing GUI debt
-        // exemption while gating the newly stateful Host half and vocabulary.
-        'packages/client/ui-conversation/src/client/*',
-        'packages/client/ui-conversation/src/invariant.ts',
-        'packages/client/ui-primitives/src/DisclosureRow.tsx',
-        'packages/client/ui-tool/src/*',
-        'packages/client/ui-slots/src/*',
-        'packages/client/ui-layout/src/*',
-        'packages/client/web/src/*',
-        'packages/host/webserver/src/*',
-        'packages/client/modules/src/client/system.ts',
-        'packages/client/hmr/src/client/index.ts',
-        // Web config-tree boot round: the new host-side web-transport halves
-        // whose remaining branches need real-composition/process harnesses.
-        // TODO(gui): cover and remove with the client test lane above.
-        'packages/client/modules/src/index.ts',
-        'packages/client/modules/src/invariant.ts',
-        'packages/client/modules/src/client/index.ts',
-        'packages/client/modules/src/client/manifest.ts',
-        'packages/client/hmr/src/index.ts',
-        'packages/client/hmr/src/invariant.ts',
-        'packages/client/connection/src/index.ts',
-        'packages/client/connection/src/http-bridge.ts',
         // This assembly imports generated Host-for-Client code that exists
         // only in lib; the post-build built-bin smoke executes both entries.
         'packages/api/remotes/src/index.ts',
         'packages/api/remotes/src/client/index.ts',
-        // Slash/command/input round: per-file gaps deferred with the same
-        // client-lane debt. TODO(gui): cover and remove with the lane above.
-        'packages/client/connection/src/client/fixture.ts',
-        'packages/client/ui-commands/src/index.ts',
-        'packages/client/ui-skill/src/index.ts',
-        'packages/client/ui-input-trigger/src/index.ts',
-        'packages/client/ui-subagent/src/index.ts',
-        'packages/client/ui-commands/src/client/popup.ts',
-        'packages/client/ui-commands/src/client/directory.ts',
-        'packages/client/ui-commands/src/client/service.ts',
-        'packages/client/ui-commands/src/client/PopupSelectView.tsx',
-        'packages/client/ui-model-selection/src/index.ts',
-        'packages/client/ui-permission-presets/src/index.ts',
-        'packages/client/ui-model-selection/src/client/ModelSelect.tsx',
-        'packages/client/ui-model-selection/src/client/directory.ts',
-        'packages/client/ui-model-selection/src/client/index.ts',
-        'packages/client/ui-model-selection/src/client/service.ts',
-        'packages/client/ui-input-trigger/src/client/controller.ts',
-        'packages/client/ui-input-trigger/src/client/service.ts',
-        'packages/client/ui-input-trigger/src/core/menu.ts',
-        'packages/client/ui-input-trigger/src/core/detect.ts',
-        'packages/client/ui-sidebar/src/client/index.ts',
-        'packages/client/ui-skill/src/client/index.ts',
-        'packages/client/ui-workspace/src/client/index.ts',
-        'packages/test-support/client-runtime/src/translate.ts',
-        'packages/client/ui-primitives/src/JsonTree.tsx',
-        'packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx',
-        'packages/client/ui-settings-models/src/client/welcome-store.ts',
-        'packages/extensions/*/src/**/*.ts',
-        'packages/extensions/*/src/**/*.tsx',
         // Typert generator: correctness is pinned by its fixture suites and
         // the byte-for-byte catalog reproduction test; per-file coverage
         // would put whole-workspace compiler analysis under v8
         // instrumentation — the coverage lane's longest tail.
         'packages/typert/generator/src/*.ts',
-        'packages/host/apiproxy/src/index.ts',
-        'packages/host/apiproxy/src/invariant.ts',
-        'packages/host/apiproxy/src/api-proxy.ts',
-        // Projection/command round: executor lifecycle branches and the
-        // registry's drive tails need the same maturing lanes. TODO(gui):
-        // cover and remove with the client test lane above.
-        'packages/interaction/commands/src/index.ts',
-        'packages/interaction/commands/src/invariant.ts',
-        'packages/session/session-projection/src/index.ts',
+        // In the main gate the debt files stay out of the global perFile:100
+        // (measured by the debt lane instead); in the debt lane itself they
+        // are the include target, so the globs must NOT be excluded.
+        ...(debtLane ? [] : coverageDebtGlobs),
         ...windowsUnsupportedCoveragePackages.map(path => `${path}/src/**/*.ts`),
         ...windowsOnlyCoverageExclusions,
         ...windowsRunnerCoverageExclusions,
@@ -270,16 +206,44 @@ export default defineConfig({
       // Per-file so a well-covered big file can't subsidize a bare one.
       // Every v8 ignore comment must carry a reason — see the quality-gates Agent Note
       // (.agents/notes/implemented/process/2026-06-11-quality-gates.md).
-      thresholds: {
-        perFile: true,
-        statements: 100,
-        branches: 100,
-        functions: 100,
-        lines: 100,
-      },
-      reporter: process.env.CI
-        ? ['text', uncoveredLocationsReporter]
-        : ['text', 'html', uncoveredLocationsReporter],
+      //
+      // Main gate: global perFile:100. Debt lane (DSH_COVERAGE_DEBT_LANE=1): global floor 0
+      // (debt files pass the aggregate) + one per-file glob threshold per debt file at its
+      // measured real value (scripts/coverage-debt.ts is the single source of truth), so the
+      // lane FAILS when a debt file drops below its locked value.
+      thresholds: debtLane
+        ? {
+            perFile: true,
+            statements: 0,
+            branches: 0,
+            functions: 0,
+            lines: 0,
+            ...Object.fromEntries(
+              coverageDebt.map(entry => [entry.glob, {
+                lines: entry.lines,
+                statements: entry.statements,
+                branches: entry.branches,
+                functions: entry.functions,
+              }]),
+            ),
+          }
+        : {
+            perFile: true,
+            statements: 100,
+            branches: 100,
+            functions: 100,
+            lines: 100,
+          },
+      reportsDirectory: debtLane ? 'coverage/debt' : 'coverage',
+      // The debt lane's json-summary feeds verify-coverage-debt.ts even when
+      // the lane flakes on the repo's known-flaky suites; reportOnFailure keeps
+      // the ratchet's input deterministic without masking real test failures.
+      reportOnFailure: true,
+      reporter: debtLane
+        ? ['json-summary', 'text']
+        : process.env.CI
+          ? ['text', 'json-summary', uncoveredLocationsReporter]
+          : ['text', 'html', 'json-summary', uncoveredLocationsReporter],
     },
   },
 })

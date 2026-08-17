@@ -5,7 +5,7 @@
     "correctness": "off"
   },
   "options": {
-    "reportUnusedDisableDirectives": "warn",
+    "reportUnusedDisableDirectives": "error",
     "typeAware": true
   },
   "env": {
@@ -134,6 +134,64 @@
         "typescript/unbound-method": "error",
         "typescript/unified-signatures": "error",
         "typescript/use-unknown-in-catch-callback-variable": "error",
+        // ESLint correctness ruleset, enabled rule-by-rule so a new Oxlint
+        // correctness rule cannot be born silently off. Rules with in-repo
+        // passivo are triaged individually: those we declined carry an "off"
+        // with the reason here; the rest are green and stay at "error". The
+        // executable-contract spec fails when the installed binary's eslint
+        // correctness set contains a rule that is neither enabled nor declined.
+        "constructor-super": "error",
+        "for-direction": "error",
+        "getter-return": "error",
+        "no-async-promise-executor": "error",
+        "no-caller": "error",
+        "no-class-assign": "error",
+        "no-compare-neg-zero": "error",
+        "no-cond-assign": "error",
+        "no-const-assign": "error",
+        "no-constant-binary-expression": "error",
+        "no-constant-condition": "error",
+        "no-debugger": "error",
+        "no-delete-var": "error",
+        "no-dupe-class-members": "error",
+        "no-dupe-else-if": "error",
+        "no-dupe-keys": "error",
+        "no-duplicate-case": "error",
+        "no-empty-character-class": "error",
+        "no-empty-pattern": "error",
+        "no-eval": "error",
+        "no-ex-assign": "error",
+        "no-extra-boolean-cast": "error",
+        "no-func-assign": "error",
+        "no-global-assign": "error",
+        "no-import-assign": "error",
+        "no-invalid-regexp": "error",
+        "no-irregular-whitespace": "error",
+        "no-iterator": "error",
+        "no-loss-of-precision": "error",
+        "no-misleading-character-class": "error",
+        "no-new-native-nonconstructor": "error",
+        "no-nonoctal-decimal-escape": "error",
+        "no-obj-calls": "error",
+        "no-self-assign": "error",
+        "no-setter-return": "error",
+        "no-shadow-restricted-names": "error",
+        "no-this-before-super": "error",
+        "no-unassigned-vars": "error",
+        "no-unreachable": "error",
+        "no-unsafe-finally": "error",
+        "no-unsafe-negation": "error",
+        "no-unused-labels": "error",
+        "no-unused-private-class-members": "error",
+        "no-useless-backreference": "error",
+        "no-useless-catch": "error",
+        "no-useless-rename": "error",
+        "no-with": "error",
+        "use-isnan": "error",
+        "valid-typeof": "error",
+        "no-control-regex": "off", // Text-processing code deliberately matches control characters (ANSI stripping, title normalization); the pattern is the feature.
+        "no-empty-static-block": "off", // The TypeGraph syntax fixture preserves an empty static block for generator coverage.
+        "no-unsafe-optional-chaining": "off", // Tests assert presence via x?.y followed by a direct access; presence is guaranteed by construction and a miss must fail loudly.
         "no-void": "off" // void foo() marks deliberate fire-and-forget arrow listeners.
       },
       "plugins": [
@@ -170,7 +228,13 @@
           {
             "considerDefaultExhaustiveForUnions": true
           }
-        ]
+        ],
+        // Correctness rules whose only in-repo violations live in tests: source
+        // stays protected while test fixtures keep their deliberate shapes.
+        "require-yield": "error", // Async-generator stubs that throw or await (never yield) are a test idiom; src generators must still yield.
+        "no-sparse-arrays": "error", // A sparse array is only deliberate as a non-JSON test fixture.
+        "no-useless-escape": "error", // Escaped brackets are only deliberate in test snapshot matchers.
+        "no-unsafe-optional-chaining": "error" // Tests guarantee presence by construction and want the loud TypeError; src must not short-circuit into arithmetic or spread.
       },
       "plugins": [
         "typescript"
@@ -315,6 +379,16 @@
       ],
       "rules": {
         "@stylistic/quotes": "off"
+      }
+    },
+    {
+      // Examples fixtures deliberately use async-generator stubs that throw or
+      // await (never yield) to conform to AsyncIterable interfaces.
+      "files": [
+        "examples/**/tests/fixtures/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "require-yield": "off"
       }
     }
   ]

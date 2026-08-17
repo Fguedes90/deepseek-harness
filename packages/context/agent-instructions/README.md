@@ -1,7 +1,5 @@
 # @deepseek-ai/dsh-agent-instructions
 
-English | [中文](README.zh.md)
-
 Per-session workspace instruction loading for `AGENTS.md`-compatible files. The plugin injects the initial user-global and project instruction chain into durable history, then discovers nested files and reports later changes or removals after successful filesystem tool calls.
 
 ## Lifecycle
@@ -16,7 +14,7 @@ Instruction reads use the optional `ctx.fs` provider. The plugin does not static
 
 Baseline instructions are durable user-role messages framed with the familiar system-reminder pattern:
 
-```md
+```markdown
 <system-reminder>
 The following workspace instructions may be relevant to your work. Use them as guidance when applicable. More specific instructions take precedence over broader ones. They do not override system, developer, or direct user instructions.
 
@@ -32,7 +30,7 @@ Instructions from: AGENTS.md
 
 Newly reached scopes use a durable sourced `user/message`:
 
-```md
+```markdown
 <system-reminder>
 Additional instructions from: packages/app/AGENTS.md
 

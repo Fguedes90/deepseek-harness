@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-26-packed-chunk-rows-by-default.zh.md)
-
 ## Problem
 
 Provider streams produce many token-sized `assistant/chunk` delta events whose repeated JSON envelopes can outweigh their payloads. The session log must retain each chunk as a distinct logical event: live `session/event` delivery, sequence numbers, `sourceEventSeqs`, replay, cancellation evidence, and UI streaming all depend on those boundaries.
@@ -38,7 +36,7 @@ The command remains linked from the testing policy and ACP snapshot README while
 
 ### Verification contract
 
-JSONL persistence tests prove that omission writes a packed row, explicit `false` writes one event per line, and both forms load identical events. Canonicalizer unit tests cover header preservation, unpacked conversion, non-session JSONL, already-packed idempotence, and malformed input. The keyless snapshot gate covers every committed fixture and assembled replay path; documentation gates keep config defaults and bilingual contracts aligned.
+JSONL persistence tests prove that omission writes a packed row, explicit `false` writes one event per line, and both forms load identical events. Canonicalizer unit tests cover header preservation, unpacked conversion, non-session JSONL, already-packed idempotence, and malformed input. The keyless snapshot gate covers every committed fixture and assembled replay path; documentation gates keep config defaults aligned.
 
 ## Alternatives considered
 

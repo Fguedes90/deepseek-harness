@@ -12,25 +12,25 @@ interface Profile {
   readonly sha256: string
 }
 
-// A one-time audit against eslint.config.mjs blob 696b08282885296830189fdafe7051a356806fc2
-// mapped @typescript-eslint/* to typescript/* and four extension rules to their
-// Oxlint core equivalents. These fingerprints pin the resulting repository
-// snapshot; they do not re-evaluate that deleted baseline or track its preset.
+// These fingerprints pin the repository's merged lint rule snapshot per file
+// class, so a rule added, removed, or re-graded anywhere in `.oxlintrc.json`
+// fails here and must be re-pinned by a reviewed edit. `indexes` selects the
+// overrides that a file of that class merges, in declaration order.
 const profiles = {
   source: {
-    count: 88,
+    count: 141,
     indexes: [0, 1, 4, 5],
-    sha256: 'da1dfd77cb6eb66be93d8d3820f9b9b68b7aa391c24680f8851c0910298f9e3b',
+    sha256: '0e4593b443188b6700b03de85f0860ecd95f6c9767d416a14f2efa385a8de046',
   },
   example: {
-    count: 87,
+    count: 140,
     indexes: [0, 1, 2, 4, 5],
-    sha256: '6a2606053bc1ec1de3b02611de88ea51d201dac13a1f193e4934d33c08b95f08',
+    sha256: 'e9cce3eb34492b6ea8fc947291909085d0072b61a3468bd50fb8ca269b94b7ff',
   },
   test: {
-    count: 83,
+    count: 132,
     indexes: [0, 3, 4, 5],
-    sha256: '7995e14926a36c40bd65c474637735222a95fb030395681685f03060e50a7b78',
+    sha256: '326702b3f03e1bfd3c7200736b6dc66921921fa5eeeede531298eb30abb7f73a',
   },
 } as const satisfies Record<string, Profile>
 
@@ -85,7 +85,7 @@ describe('Oxlint repository rule fingerprint', () => {
   const overrides: readonly unknown[] = parsed.overrides
 
   it('pins every override field', () => {
-    expect(overrides).toHaveLength(8)
+    expect(overrides).toHaveLength(9)
   })
 
   it.each(Object.entries(profiles))('pins the %s rule profile', (_name, profile) => {

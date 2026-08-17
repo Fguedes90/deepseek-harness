@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-31-workspace-write-surface-default.zh.md)
-
 ## Problem
 
 The shipped terminal and browser surfaces exposed the same coding tools under different unconfined compositions. Web mounted the sandbox and permission services but selected `danger-full-access`; the TUI mounted the unrestricted local bash and filesystem providers directly. A fresh coding session could therefore mutate any path its same-UID process could reach before the user deliberately chose that authority.
@@ -18,7 +16,7 @@ The mode governs file effects only. Sandboxed bash and filesystem mutations admi
 
 ## Testing
 
-The keyless shipped-TUI pseudo-terminal smoke boots the real Loader tree, reads the persisted first request, and asserts both the `sandbox_permissions`/`justification` bash schema and the initial workspace-write event triplet. The shipped-Web composition smoke asserts the same policy, approval, and Permission defaults. The assembled browser Settings snapshot opens on Workspace Write, preserves an existing workspace-write session while changing the future default, and still proves the confirmed Full-access path.
+The keyless shipped-TUI pseudo-terminal smoke boots the real Loader tree, reads the persisted first request, and asserts both the `sandbox_permissions`/`justification` bash schema and the initial workspace-write event triple. The shipped-Web composition smoke asserts the same policy, approval, and Permission defaults. The assembled browser Settings snapshot opens on Workspace Write, preserves an existing workspace-write session while changing the future default, and still proves the confirmed Full-access path.
 
 ## Alternatives considered
 

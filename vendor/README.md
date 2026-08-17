@@ -2,25 +2,33 @@
 
 This directory contains source-vendored copies of the Cordis framework and its foundation libraries. They are copied into this monorepo instead of being depended on via npm, so that the harness fully owns its framework layer (auditable, patchable, pinned).
 
-All vendored packages are **renamed into the `@deepseek-ai` scope** (`cordis` → `@deepseek-ai/cordis`, `@cordisjs/plugin-<x>` → `@deepseek-ai/cordis-plugin-<x>`): every harness package declares `cordis` as a peer dependency, so publishing the harness publishes this framework layer too, and a publication under the upstream names would squat them on the registry. Directory names and upstream version numbers are deliberately unchanged, so the manifest below still reads as an upstream snapshot. `pnpm-workspace.yaml#linkWorkspacePackages` makes those preserved semver ranges resolve these pinned workspaces, including imports from built `lib/`. The `hygiene` gate `verify-vendored-links` asserts every vendored name resolves to a workspace `link:` in `pnpm-lock.yaml` with no registry copy alongside. Schemastery's manifest additionally declares a conditional `exports` map (import → `.mjs`, require → `.cjs`): pnpm links the directory itself, so without `exports` Node's ESM resolver would fall back to `main` and load the CJS entry whose lazy `require('@deepseek-ai/cosmokit')` can race ESM loading of the same linked module under module-hook hosts (vitest). Upstream MIT `LICENSE` files are preserved in each package directory.
+All vendored packages are **renamed into the `@deepseek-ai` scope** (`cordis` → `@deepseek-ai/cordis`, `@cordisjs/plugin-<x>` → `@deepseek-ai/cordis-plugin-<x>`): every harness package declares `cordis` as a peer dependency, so publishing the harness publishes this framework layer too, and a publication under the upstream names would squat them on the registry. Directory names are deliberately unchanged; the manifest's `Version` column records the **upstream baseline** version at the pinned commit, while each vendored `package.json` carries its own harness release version ahead of it (log entry 21). `pnpm-workspace.yaml#linkWorkspacePackages` makes the preserved semver ranges resolve these pinned workspaces, including imports from built `lib/`. The `hygiene` gate `verify-vendored-links` asserts every vendored name resolves to a workspace `link:` in `pnpm-lock.yaml` with no registry copy alongside. Schemastery's manifest additionally declares a conditional `exports` map (import → `.mjs`, require → `.cjs`): pnpm links the directory itself, so without `exports` Node's ESM resolver would fall back to `main` and load the CJS entry whose lazy `require('@deepseek-ai/cosmokit')` can race ESM loading of the same linked module under module-hook hosts (vitest). Upstream MIT `LICENSE` files are preserved in each package directory.
 
 This file covers the manifest, the local-modification log, and the procedure for **updating** an existing vendored package. To **add a new** one, see the cookbook guide: [docs/cookbook/adding-a-vendored-package.md](../docs/cookbook/adding-a-vendored-package.md).
 
 ## Manifest
 
-Upstream workspace: `cordis-workspace` (local checkout: `~/repos/cordis-workspace`).
+Upstream is read through forks this repository's owner controls. Clone all three into `~/repos/cordis-workspace` (the path the sync procedure below assumes); each clone carries `origin` pointing at the fork and `upstream` pointing at the original project.
+
+| Local clone | Fork (`origin`) | Original project (`upstream`) |
+|---|---|---|
+| `~/repos/cordis-workspace/cordis` | https://github.com/Fguedes90/cordis | https://github.com/cordiverse/cordis |
+| `~/repos/cordis-workspace/cosmokit` | https://github.com/Fguedes90/cosmokit | https://github.com/shigma/cosmokit |
+| `~/repos/cordis-workspace/schemastery` | https://github.com/Fguedes90/schemastery | https://github.com/shigma/schemastery |
 
 | Directory | npm name | Upstream name | Version | Upstream repo | Commit |
 |---|---|---|---|---|---|
-| `cosmokit/` | `@deepseek-ai/cosmokit` | `cosmokit` | 1.8.1 | https://github.com/deepseek-harness/cosmokit | `16f6fc058ade66e8ac5da0033d35a8d0f279f544` |
-| `schemastery/` | `@deepseek-ai/schemastery` | `schemastery` | 3.18.0 | https://github.com/deepseek-harness/schemastery (`packages/core`) | `e67cee00ad725bd1534aee930a979ea3eec6f698` |
+| `cosmokit/` | `@deepseek-ai/cosmokit` | `cosmokit` | 1.8.1 | https://github.com/shigma/cosmokit | `02e691c5aa7f37f6e0b1cee7ee8f4a21c2e34507` |
+| `schemastery/` | `@deepseek-ai/schemastery` | `schemastery` | 3.18.0 | https://github.com/shigma/schemastery (`packages/core`) | `9e1f54f8ff785a4e51a022922999634205b61e1f` |
 | `cordis/` | `@deepseek-ai/cordis` | `cordis` | 4.0.0-rc.7 | https://github.com/cordiverse/cordis (`packages/core`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
 | `loader/` | `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | 1.0.0-rc.5 | https://github.com/cordiverse/cordis (`packages/loader`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
-| `include/` | `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | 1.0.4 | https://github.com/deepseek-harness/cordis (`packages/include`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `group/` | `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | 1.0.0 | https://github.com/deepseek-harness/cordis (`packages/group`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `timer/` | `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | 1.1.2 | https://github.com/deepseek-harness/cordis (`packages/timer`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `hmr/` | `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | 1.0.15 | https://github.com/deepseek-harness/cordis (`packages/hmr`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `logger-console/` | `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | 1.0.0 | https://github.com/deepseek-harness/cordis (`packages/logger-console`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `include/` | `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | 1.0.4 | https://github.com/cordiverse/cordis (`packages/include`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+| `group/` | `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | 1.0.0 | https://github.com/cordiverse/cordis (`packages/group`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+| `timer/` | `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | 1.1.2 | https://github.com/cordiverse/cordis (`packages/timer`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+| `hmr/` | `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | 1.0.15 | https://github.com/cordiverse/cordis (`packages/hmr`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+| `logger-console/` | `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | 1.0.0 | https://github.com/cordiverse/cordis (`packages/logger-console`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+
+The `Upstream repo` column carries MIT attribution, so it names each package's origin project rather than the fork the sync procedure below pulls from. All seven Cordis packages share one commit because they live in one monorepo and were vendored from one snapshot. Each baseline was derived by diffing the vendored `src/` against every upstream commit where the manifest's version was current and keeping the closest match; for the five Cordis plugins that range contains no commit touching their `src/`, so the choice is unambiguous.
 
 Third-party dependencies of the vendored packages stay on npm: `@standard-schema/spec`, `js-yaml`, `chokidar`, `picomatch`, `@babel/code-frame`, `supports-color`, `node-addon-require-builtin`.
 
@@ -28,7 +36,7 @@ Intentionally **not** vendored (verified unused by this set): `reggol`, `@cordis
 
 ## Local modifications
 
-Keep this log exhaustive — every divergence from upstream must be listed.
+Keep this log exhaustive — every divergence from upstream must be listed. The log records the **reason** for each modification, while the **content** is reproducible as a diff from the fork's `dsh` branch (`git diff <baseline>..dsh -- <caminho>`); the two are complementary — a diff does not carry motivation.
 
 1. **`hmr/src/index.ts`**: removed the `./locales/en-US.yml` / `./locales/zh-CN.yml` imports, the `.i18n({...})` call on the `Config` schema, and the `src/locales/` directory. Rationale: those imports require a runtime YAML loader hook (`@cordisjs/unyaml`) that we do not vendor; the i18n texts only localize config descriptions.
 2. **All `package.json` files**: regenerated — added `private: true`, added precise `files` entries for bundled runtime files and `lib/types/**/*.d.ts` / `.d.ts.map`, preserved `src` in `files` only for packages whose previous file list already shipped it, added a `./src/*` export where missing, pointed declaration metadata at `lib/types`, and removed upstream `devDependencies`/`scripts`/`repository` fields. Dependency and peer-dependency ranges are preserved except that `hmr` declares `esbuild` as a direct dev dependency because its source imports the `BuildFailure` type and pnpm's strict workspace resolution requires the owner package to name that dependency, and `loader` requires `node-addon-require-builtin@^0.1.4` to match the runtime used by published app packages.
@@ -48,13 +56,20 @@ Keep this log exhaustive — every divergence from upstream must be listed.
 16. **`cordis/package.json` publishes `src`**: added `src` to the `files` list, joining the other eight vendored packages. Cordis declares `"./src/*": "./src/*"` in its exports, so a tarball without `src` publishes an export map pointing at absent files; the release change judgement also reads `files` to decide whether a diff reaches the payload, and a package whose only published paths are build output has no tracked path to match.
 17. **`@deepseek-ai` rescope**: every vendored manifest `name`, every internal dependency entry among the vendored set, and every module specifier that reaches them use the scoped names in the manifest table's `npm name` column. Directory names, version numbers, and dependency ranges are unchanged, and no upstream runtime identifier is renamed — `Symbol.for('schemastery')` and Schemastery's `vendor:` metadata field keep their upstream values. Re-apply with `pnpm run rescope-vendor --apply` after a sync; the table's two name columns are the mapping, restated for consumers in [docs/rescope.md](../docs/rescope.md).
 18. **Entry `disabled` interpolation in `loader/src/config/entry.ts`**: a `disabled: !!js` expression evaluates against the loader context at every mount decision; the raw node stays in the options, so write-back keeps the `!!js` form. `disabled` is the only interpolated metadata field. Covered by `packages/boot/app-boot/tests/user-patches.spec.ts` and `apps/cli/tests/windows-shell.spec.ts`.
+19. **JSDoc enrichment beyond `cordis/src`**: the same comment-only doc enrichment described in entry 7 was also applied to `loader/src/*.ts` (all seven files, ~50 lines), `hmr/src/{index,error}.ts`, `include/src/index.ts`, `timer/src/index.ts`, and `logger-console/src/{index,shared,browser}.ts`. Comment-only; no code changes, same motivation as entry 7. Recorded separately because entry 7 names a closed list of `cordis/src` symbols, so a reader reconciling those packages against upstream would otherwise find undocumented hunks.
+20. **`hmr/src/index.ts` injection declaration**: upstream's `@Inject('loader')` / `@Inject('timer')` class decorators are expressed as `static inject = ['loader', 'timer']`. Runtime behavior is identical — `Registry.plugin()` reads the `inject` property either way — and `include/src/index.ts` already uses the static form upstream. Re-apply after a sync: copying upstream verbatim reintroduces the decorators.
+21. **Vendored `package.json` versions diverge from the baseline**: every vendored package carries a harness release version ahead of the upstream version pinned in the manifest (`cordis` 4.0.1, `cosmokit` 1.8.2, `schemastery` 3.18.1, `loader` 1.0.2, `include` 1.0.6, `group` 1.0.1, `timer` 1.1.3, `hmr` 1.0.16, `logger-console` 1.0.1). The manifest's `Version` column is the upstream baseline and is not bumped by a harness release. A sync updates the baseline column, never the local version.
+22. **`README.md` and `LICENSE` in `group/`, `timer/`, and `logger-console/`**: ours, not upstream files — those three upstream packages ship neither, and the repo requires a README per package. Not part of the upstream sync surface.
 
 ## Sync procedure
 
+The repository is the source of truth for the vendored content; the fork's `dsh` branch carries the local modifications durably as commits and is derived, never authoritative. A sync updates the fork, then imports the reconciled result back.
+
 To update a vendored package from upstream:
 
-1. In the upstream workspace, note `git rev-parse HEAD` of the relevant submodule.
-2. Copy the package's `src/` (and `bin.js`, `README.md`, `LICENSE` if changed) over the vendored directory.
-3. Re-apply the local modifications listed above (or drop them if upstream made them unnecessary — update the log either way).
-4. Update the version and commit hash in the manifest table.
-5. Run `pnpm install && pnpm run test && pnpm run build` at the repo root.
+1. In the relevant clone under `~/repos/cordis-workspace`, fetch `upstream` and rebase the fork's `dsh` branch onto the new upstream commit. The branch was created from the manifest's baseline SHA, so git resolves the local modifications against the new upstream instead of a human re-applying them by hand.
+2. Run `pnpm run vendor-fork import` from the repo root to project the reconciled `dsh` branch back into `vendor/`, reapplying the `@deepseek-ai` rescope.
+3. Update the baseline version and commit hash in the manifest table. Leave the vendored `package.json` version alone (entry 21).
+4. Run `pnpm install && pnpm run test && pnpm run build` at the repo root.
+
+When the vendored content changes locally (not via a sync), run `pnpm run vendor-fork export` to project `vendor/` onto each fork's `dsh` branch with the rescope undone; the branch is rebuilt over the manifest's baseline commit. `pnpm run vendor-fork verify` asserts the current `vendor/` matches what the `dsh` branch would produce. The `dsh` branch is never the source of truth: it is derived by export, and an `import` is only safe after a rebase onto upstream.

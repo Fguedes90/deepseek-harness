@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-28-portable-execution-world-consumers.zh.md)
-
 ## Problem
 
 The filesystem and subprocess seams made file and ordinary process access replaceable, but PTY and LSP still reached host Node APIs directly. A remote execution provider therefore appeared to need separate PTY and LSP packages even though their domain behavior did not change. Those packages would be shallow adapters: each would duplicate an existing consumer merely to replace its file and process operations.
@@ -26,19 +24,9 @@ Generic consumers use that execution world:
 - `dsh-lsp-stdio` reads and contains source through `ctx.fs`, resolves and launches language servers through `ctx.subprocess`, and carries provider-owned file URIs through initialization and result rendering. One provider-lifetime signal aborts filesystem and protocol work during disposal, including workspace lookup before queue ownership; its JSON-RPC, pooling, synchronization, and normalization stay unchanged.
 - `dsh-terminal-bash` maps persistent-shell semantics onto `ctx.subprocess.spawnTerminal()`. The local `node-pty` and process-inspection implementation moves into `dsh-subprocess-local`; another subprocess provider supplies the same primitive. `danger-full-access` needs no `ctx.sandbox`; a confined mode requires a same-world sandbox provider and fails before spawn when none is mounted. Prompt and silence evidence collected during asynchronous pre-write inspection is discarded when the provider write begins. Cancellation retains the send reservation while an in-flight write settles and then signals the foreground group, so late bytes or the signal cannot target a successor; an in-flight readiness poll cannot release that reservation, and a rejected write sends no signal. The absolute deadline remains armed throughout cancellation. A signal failure becomes terminal transport failure. Completion of a stale inspection resumes polling for the current send. Startup cancellation begins terminal rollback without waiting for a stalled readiness or signalling call. Close rejects new public signals and delegates provider-observable session quiescence to the handle's awaited termination operation.
 
-## E2B POC boundary
-
-The opt-in E2B realization has exactly three provider-specific packages under `packages/e2b/`: `dsh-e2b` creates one sandbox and deletes it on timeout or disposal, `dsh-fs-e2b` implements `ctx.fs`, and `dsh-subprocess-e2b` implements `ctx.subprocess` over E2B Commands, PTYs, and remote Linux process groups. The two adapters obtain the sole SDK handle from the owner and never create private sandboxes.
-
-E2B owns the mutable filesystem, managed command and Bash processes, terminal allocation and terminal-session groups, language-server processes and source reads, and adapter-private files under `.dsh-e2b`. The host owns Cordis and plugin objects, the agent loop, agent/session/goal state, session logs and persistence, LLM calls, prompts and tools, authority, skills, subagent orchestration, PTY buffers and readiness, LSP protocol state, and E2B SDK/network buffers. The overlay neither uploads nor synchronizes the host workspace.
-
-The adapters retain only substrate mechanics. Filesystem canonicalization crosses the SDK's decoded command transport as strict base64-encoded NUL framing; streamed reads leave byte ceilings with consumers. Subprocess command output and environment snapshots use ASCII/base64 where SDK chunk decoding would otherwise lose bytes, while private control shells isolate profiles and later launches blank discovered credential-shaped names. Process and terminal cleanup uses remote groups and proves quiescence before settlement.
-
-Sandbox state is deliberately ephemeral: timeout and disposal delete the remote files and unmanaged state. The POC adds no reconnect or pause/leave retention, session-persistence backend, template builder, volume, snapshot, network-policy layer, sandbox catalog, workspace synchronization, durable remote handles, or whole-harness execution.
-
 ## Verification
 
-Focused package suites pin sandbox lifecycle, canonical path framing, filesystem metadata and atomic versions, subprocess publication/rollback, terminal text I/O and session cleanup, output limits, cancellation, disposal, and invariant registration. A credential-gated Loader composition exercises the same three-package provider through source imports and built exports, including FS/Bash visibility, hostile login profiles, byte-split UTF-8 output, process and terminal cleanup, LSP queries, host-workspace isolation, and final sandbox deletion.
+Focused package suites pin sandbox lifecycle, canonical path framing, filesystem metadata and atomic versions, subprocess publication/rollback, terminal text I/O and session cleanup, output limits, cancellation, disposal, and invariant registration.
 
 ## Alternatives considered
 
@@ -69,5 +57,3 @@ A remote execution provider implements only its shared sandbox owner plus filesy
 The fundamental interfaces are wider, and a filesystem/subprocess pair must agree on one execution world. The added operations are limited to facts and lifecycle mechanics that current generic consumers require; model schemas, protocol framing, readiness policy, and presentation do not leak into the providers.
 
 The local implementation absorbs `node-pty` and platform process inspection because it owns local terminal mechanics. This moves code without weakening terminal teardown: disposal sweeps descendants before and after terminating the top-level shell, waits for exact PID-identity-fenced descendants retained during foreground inspection, and retains Linux session members that survive top-level exit. macOS cannot enumerate a POSIX session after its leader exits, so a child that reparents between inspection snapshots remains an explicit local-provider limitation rather than a reason to move process mechanics back into the PTY consumer.
-
-The E2B composition demonstrates that a shared sandbox owner plus filesystem and subprocess adapters are sufficient to move the mutable coding world off-host while leaving higher capabilities provider-neutral. Its POC limits remain explicit: the SDK retains complete command transport in host memory, remote startup cannot publish a PID synchronously, exact terminal stdin-wait and independent signal facts are unavailable, numeric PID/PGID operations are not identity-fenced, the initial environment probe cannot hide unknown sandbox-default secrets from already-running same-UID processes, and adapter artifacts remain until sandbox deletion. These are provider constraints, not justification for compatibility shims or more E2B packages.

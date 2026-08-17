@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-07-mcp-client-plugin.zh.md)
-
 ## Problem
 
 The harness had no way to consume tools from the MCP (Model Context Protocol) ecosystem. MCP is the emerging standard for tool servers — GitHub, filesystem, databases, code search, and hundreds of community servers expose tools via MCP. Users want to point the harness at one or more MCP servers and have their tools appear as native model-facing tools, without writing per-server glue code.
@@ -32,7 +30,7 @@ Namespace plugin (named exports `name`/`inject`/`Config`/`apply`, no `export def
 
 Flat discriminated union on the `transport` field:
 
-```typescript
+```ts
 interface StdioConfig {
   transport: 'stdio'
   serverName: string          // required namespace, ^[A-Za-z0-9_-]{1,32}$
@@ -52,6 +50,8 @@ interface StreamableHttpConfig {
 }
 
 type Config = StdioConfig | StreamableHttpConfig
+
+export {}
 ```
 
 `serverName` is the stable local identity that namespaces this server's tools in the model-facing name (below). It is deliberately user configuration, NOT the remote `serverInfo.name`: the remote name is untrusted input, is not unique across deployments (prod and staging instances of one server report the same name), and may change on server upgrade — none of which may silently rename model-facing tools. A duplicate `serverName` across live instances is a configuration error: the later instance fails at load with an actionable message, never silent shadowing or skipping. A short `serverName` (`gh`) is also the knob for shortening public names.
@@ -106,7 +106,9 @@ This server-qualified shape is the de-facto standard among multi-server agent cl
 
 MCP allows tool names up to 128 characters including `.`; the DeepSeek function-name contract allows `[A-Za-z0-9_-]` and at most 64. Public names are normalized deterministically: invalid characters become `_`, and when replacement or truncation changed the name, a 12-hex-char SHA-256 hash of the `(serverName, rawName)` identity is appended so distinct MCP identities can never collapse into the same public name:
 
-```typescript
+```ts
+declare function sha256(input: string): string
+
 function publicToolName(serverName: string, rawName: string): string {
   const joined = `mcp__${serverName}__${rawName}`
   const normalized = joined.replace(/[^A-Za-z0-9_-]/g, '_')

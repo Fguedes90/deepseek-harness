@@ -1420,7 +1420,9 @@ describe('manual web performance: complex workspace and history', () => {
       try {
         await closePerformanceWorld(world)
       } catch (cleanupError) {
+        // oxlint-disable-next-line no-unsafe-finally -- teardown throw fires only when the primary test body succeeded
         if (testFailure === undefined) throw cleanupError
+        // oxlint-disable-next-line no-unsafe-finally -- teardown AggregateError folds the primary failure in rather than masking it
         throw new AggregateError(
           [testFailure, cleanupError],
           'continuous conversation performance test and teardown failed',

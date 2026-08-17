@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-07-06-tool-result-retention-library.zh.md)
-
 ## Problem
 
 Several model-facing tools already bound the amount of context they return, but each one owns a different local mechanism and vocabulary: bash keeps a tail plus spill files, web search caps source lists, web fetch caps body content, and `glob` / `grep` discovery needs an inline first page while keeping exact omission metadata for the full result set. A single `truncate(text)` helper cannot cover those cases: item tools need item counts and grouping outside the primitive, while text tools need byte budgets and UTF-8-safe head/tail cuts.
@@ -21,7 +19,7 @@ The library has two independent retainers:
 
 Both retainers return a small `PushDecision` after each `push()` so callers can tell whether that unit/chunk was fully retained and whether the accumulated result is now truncated. Omission counts are exact because callers keep feeding every observed item/chunk.
 
-```ts ignore-check
+```ts
 /**
  * How much content the retainer omitted.
  *
@@ -60,13 +58,15 @@ interface RetainedText {
   truncated: boolean
   omittedBytes: Omitted
 }
+
+export {}
 ```
 
 ### Strategies
 
 Item retention supports a head window. Text retention supports head, tail, and headTail byte windows.
 
-```ts ignore-check
+```ts
 type ItemRetentionStrategy =
   | {
       /** Keep the first `maxItems` units. Use for `glob`, `grep`, and web sources. */
@@ -91,6 +91,8 @@ type TextRetentionStrategy =
       headBytes: number
       tailBytes: number
     }
+
+export {}
 ```
 
 ### Tool mapping
