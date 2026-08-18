@@ -90,9 +90,12 @@
     - id: directory-picker
       name: '@deepseek-ai/dsh-host-directory-picker-auto'
 
-    # Read-only projection of current Loader entries for trusted client RPCs.
+    # Projection of current Loader entries plus the enable/disable Remote,
+    # writing user overrides into the profile patch layer.
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
+      config:
+        patchPath: !!js dshPatchPath
 
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.

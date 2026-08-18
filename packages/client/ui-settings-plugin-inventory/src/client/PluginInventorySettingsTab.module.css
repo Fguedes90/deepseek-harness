@@ -37,6 +37,12 @@
   cursor: pointer;
 }
 
+.mutationFailure {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .catalog {
   display: flex;
   flex-direction: column;
@@ -110,6 +116,9 @@
 }
 
 .card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -122,16 +131,40 @@
   box-shadow: var(--dsw-shadow-lv1);
 }
 
+.card[data-failed='true'] {
+  border-color: var(--dsw-alias-state-error-primary);
+}
+
+.toggle {
+  flex: none;
+  margin: 0 12px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+}
+
+.toggle[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.card[data-saving='true'] .toggle {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .cardContent {
   box-sizing: border-box;
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: 100%;
+  min-width: 0;
   min-height: 52px;
   border: 0;
-  padding: 12px 14px;
+  padding: 12px 14px 12px 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -206,6 +239,13 @@
   color: var(--dsw-alias-state-success-primary);
 }
 
+.savingTag {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
 .chevron {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
@@ -216,6 +256,7 @@
 }
 
 .cardDetails {
+  flex-basis: 100%;
   border-top: 1px solid var(--dsw-alias-border-l2);
   padding: 10px 14px 12px;
   background: var(--dsw-alias-bg-module-platform);

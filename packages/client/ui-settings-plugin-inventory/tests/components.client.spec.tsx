@@ -13,24 +13,41 @@ afterEach(cleanup)
 type Snapshot = Awaited<ReturnType<PluginInventorySettingsTabInjected['list']>>
 const t = ((key: PluginInventoryLocaleKey): string => en[key]) as PluginInventorySettingsTabProps['t']
 
-function props(list: PluginInventorySettingsTabInjected['list']): PluginInventorySettingsTabProps {
+function props(
+  list: PluginInventorySettingsTabInjected['list'],
+  overrides: Partial<Pick<PluginInventorySettingsTabInjected, 'setEnabled' | 'subscribe'>> = {},
+): PluginInventorySettingsTabProps {
   return {
     t,
     list,
+    setEnabled: async () => SNAPSHOT,
+    subscribe: () => () => {},
+    ...overrides,
   } as PluginInventorySettingsTabProps
 }
 
 const SNAPSHOT = {
   entries: [
-    { entryId: '8a1b2c3d', moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
-    { entryId: 'pending', moduleName: 'cordis:pending-name', enabled: true, fiberPhase: 'pending' },
-    { entryId: 'loading', moduleName: '@fixture/loading-name', enabled: true, fiberPhase: 'loading' },
-    { entryId: 'failed', moduleName: '@fixture/failed-name', enabled: true, fiberPhase: 'failed' },
-    { entryId: 'unloading', moduleName: '@fixture/unloading-name', enabled: true, fiberPhase: 'unloading' },
-    { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null },
-    { entryId: 'disabled-entry', moduleName: '@deepseek-ai/dsh-host-directory-picker-native', enabled: false, fiberPhase: null },
+    { entryId: '8a1b2c3d', moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active', toggle: 'available' },
+    { entryId: 'pending', moduleName: 'cordis:pending-name', enabled: true, fiberPhase: 'pending', toggle: 'available' },
+    { entryId: 'loading', moduleName: '@fixture/loading-name', enabled: true, fiberPhase: 'loading', toggle: 'available' },
+    { entryId: 'failed', moduleName: '@fixture/failed-name', enabled: true, fiberPhase: 'failed', toggle: 'available' },
+    { entryId: 'unloading', moduleName: '@fixture/unloading-name', enabled: true, fiberPhase: 'unloading', toggle: 'available' },
+    { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null, toggle: 'protected' },
+    { entryId: 'disabled-entry', moduleName: '@deepseek-ai/dsh-host-directory-picker-native', enabled: false, fiberPhase: null, toggle: 'available' },
+    { entryId: 'inherited-entry', moduleName: '@deepseek-ai/cordis-plugin-group', enabled: false, fiberPhase: null, toggle: 'inherited' },
+    { entryId: 'expression-entry', moduleName: '@fixture/expression-name', enabled: false, fiberPhase: null, toggle: 'expression' },
   ],
 } as unknown as Snapshot
+
+/** Locate the enable checkbox of one inventory row by its entry id. */
+function checkboxOf(entryId: string): HTMLInputElement {
+  const li = document.querySelector(`[data-plugin-entry="${entryId}"]`)
+  if (!li) throw new Error(`no row for ${entryId}`)
+  const control = li.querySelector('input[type="checkbox"]')
+  if (!(control instanceof HTMLInputElement)) throw new Error(`no checkbox for ${entryId}`)
+  return control
+}
 
 describe('PluginInventorySettingsTab', () => {
   it('renders runtime status only for enabled plugins', async () => {
@@ -43,10 +60,10 @@ describe('PluginInventorySettingsTab', () => {
     expect(list).toHaveBeenCalledOnce()
     expect(screen.getByRole('searchbox', { name: en.search })).toBeTruthy()
     expect(screen.getByRole('heading', { name: en.catalog })).toBeTruthy()
-    expect(view.container.querySelector('[data-plugin-count]')?.textContent).toBe('7')
-    expect(screen.getAllByRole('listitem')).toHaveLength(7)
+    expect(view.container.querySelector('[data-plugin-count]')?.textContent).toBe('9')
+    expect(screen.getAllByRole('listitem')).toHaveLength(9)
     expect(screen.getAllByText(en.enabledTag)).toHaveLength(6)
-    expect(screen.getByText(en.disabledTag)).toBeTruthy()
+    expect(screen.getAllByText(en.disabledTag)).toHaveLength(3)
     for (const value of [
       'Mounted',
       'Waiting for dependencies',
@@ -123,5 +140,153 @@ describe('PluginInventorySettingsTab', () => {
     const pendingFailure = render(<PluginInventorySettingsTab {...props(() => deferredFailure.promise)} />)
     pendingFailure.unmount()
     await act(async () => { deferredFailure.reject(new Error('late failure')) })
+  })
+
+  it('enables a disabled plugin immediately with the returned snapshot and no refetch', async () => {
+    const list = vi.fn<PluginInventorySettingsTabInjected['list']>().mockResolvedValue(SNAPSHOT)
+    const enabled = {
+      ...SNAPSHOT,
+      entries: SNAPSHOT.entries.map(entry =>
+        entry.entryId === 'disabled-entry' ? { ...entry, enabled: true } : entry),
+    } as Snapshot
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockResolvedValue(enabled)
+    render(<PluginInventorySettingsTab {...props(list, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    expect(screen.queryByText(en.confirmTitle)).toBeNull()
+    fireEvent.click(checkboxOf('disabled-entry'))
+
+    await waitFor(() => { expect(setEnabled).toHaveBeenCalledOnce() })
+    expect(setEnabled).toHaveBeenCalledWith('disabled-entry', true)
+    expect(screen.queryByText(en.confirmTitle)).toBeNull()
+    await waitFor(() => { expect(checkboxOf('disabled-entry').checked).toBe(true) })
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('exposes the saving state while a toggle is pending', async () => {
+    const deferred = Promise.withResolvers<Snapshot>()
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockReturnValue(deferred.promise)
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('disabled-entry'))
+    expect(checkboxOf('disabled-entry').disabled).toBe(true)
+    expect(screen.getByText(en.saving)).toBeTruthy()
+    expect(checkboxOf('disabled-entry').getAttribute('aria-busy')).toBe('true')
+
+    await act(async () => {
+      deferred.resolve({
+        ...SNAPSHOT,
+        entries: SNAPSHOT.entries.map(entry =>
+          entry.entryId === 'disabled-entry' ? { ...entry, enabled: true } : entry),
+      })
+    })
+    expect(screen.queryByText(en.saving)).toBeNull()
+    expect(checkboxOf('disabled-entry').disabled).toBe(false)
+  })
+
+  it('gates a disable behind RiskConfirmation until acknowledged and confirmed', async () => {
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockResolvedValue(SNAPSHOT)
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('8a1b2c3d'))
+    expect(screen.getByText(en.confirmTitle)).toBeTruthy()
+    expect(setEnabled).not.toHaveBeenCalled()
+
+    const confirm = screen.getByRole('button', { name: en.confirmDisable })
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    const acknowledge = screen.getByRole('checkbox', { name: en.confirmAcknowledge })
+    fireEvent.click(acknowledge)
+    expect((confirm as HTMLButtonElement).disabled).toBe(false)
+
+    fireEvent.click(confirm)
+    await waitFor(() => { expect(setEnabled).toHaveBeenCalledOnce() })
+    expect(setEnabled).toHaveBeenCalledWith('8a1b2c3d', false)
+    expect(screen.queryByText(en.confirmTitle)).toBeNull()
+  })
+
+  it('cancelling the confirmation calls nothing', async () => {
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockResolvedValue(SNAPSHOT)
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('8a1b2c3d'))
+    fireEvent.click(screen.getByRole('button', { name: en.confirmCancel }))
+    expect(screen.queryByText(en.confirmTitle)).toBeNull()
+    expect(setEnabled).not.toHaveBeenCalled()
+  })
+
+  it('renders non-available toggle states as disabled controls with their rationale', async () => {
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT)} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    const protectedCheckbox = checkboxOf('unobserved')
+    expect(protectedCheckbox.disabled).toBe(true)
+    expect(protectedCheckbox.getAttribute('aria-description')).toBe(en.toggleProtected)
+
+    const inheritedCheckbox = checkboxOf('inherited-entry')
+    expect(inheritedCheckbox.disabled).toBe(true)
+    expect(inheritedCheckbox.getAttribute('aria-description')).toBe(en.toggleInherited)
+
+    const expressionCheckbox = checkboxOf('expression-entry')
+    expect(expressionCheckbox.disabled).toBe(true)
+    expect(expressionCheckbox.getAttribute('aria-description')).toBe(en.toggleExpression)
+  })
+
+  it('surfaces a rejected toggle as a mutation alert and keeps the previous snapshot', async () => {
+    const list = vi.fn<PluginInventorySettingsTabInjected['list']>().mockResolvedValue(SNAPSHOT)
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockRejectedValue(new Error('pluginInventory.setEnabled failed: PATCH_WRITE_FAILED: unwritable'))
+    render(<PluginInventorySettingsTab {...props(list, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('disabled-entry'))
+    expect((await screen.findByRole('alert')).textContent).toBe(en.mutationError)
+    expect(checkboxOf('disabled-entry').checked).toBe(false)
+    expect(screen.getAllByText(en.disabledTag).length).toBeGreaterThan(0)
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads when the Host reports an external enablement change', async () => {
+    const list = vi.fn<PluginInventorySettingsTabInjected['list']>().mockResolvedValue(SNAPSHOT)
+    let listener: (() => void) | undefined
+    const subscribe = vi.fn<PluginInventorySettingsTabInjected['subscribe']>((fn) => {
+      listener = fn
+      return () => {}
+    })
+    render(<PluginInventorySettingsTab {...props(list, { subscribe })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledOnce()
+
+    await act(async () => { listener?.() })
+    await waitFor(() => { expect(list).toHaveBeenCalledTimes(2) })
+  })
+
+  it('ignores a successful toggle resolution after unmount', async () => {
+    const deferred = Promise.withResolvers<Snapshot>()
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>().mockReturnValue(deferred.promise)
+    const view = render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('disabled-entry'))
+    view.unmount()
+    await act(async () => { deferred.resolve(SNAPSHOT) })
+  })
+
+  it('ignores a rejected toggle resolution after unmount', async () => {
+    const deferred = Promise.withResolvers<Snapshot>()
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>().mockReturnValue(deferred.promise)
+    const view = render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('disabled-entry'))
+    view.unmount()
+    await act(async () => { deferred.reject(new Error('late failure')) })
   })
 })

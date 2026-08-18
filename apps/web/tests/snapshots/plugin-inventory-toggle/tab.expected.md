@@ -1,0 +1,38 @@
+- dialog "设置":
+  - navigation:
+    - text: 设置
+    - button "通用设置":
+      - img
+      - text: 通用设置
+    - button "模型":
+      - img
+      - text: 模型
+    - button "插件":
+      - img
+      - text: 插件
+    - button "Agent 预设":
+      - img
+      - text: Agent 预设
+  - button "打开配置文件"
+  - button "关闭":
+    - img
+    - text: 关闭
+  - heading "插件" [level=2]
+  - paragraph: 配置和查看本部署已安装的插件。
+  - tablist "插件视图":
+    - tab "插件配置"
+    - tab "插件列表" [selected]
+  - tabpanel "插件列表":
+    - img
+    - text: 搜索插件
+    - searchbox "搜索插件": repeat-tool-reminder
+    - heading "插件列表" [level=3]
+    - text: "1"
+    - list:
+      - listitem:
+        - checkbox "插件开关" [checked]
+        - button "repeat-tool-reminder, 已挂载, 已启用":
+          - strong: repeat-tool-reminder
+          - img "已挂载"
+          - text: 已启用
+          - img

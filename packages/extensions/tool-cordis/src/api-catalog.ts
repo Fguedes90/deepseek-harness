@@ -2374,6 +2374,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; their messages already obey the immutable creation contract.' }],
   },
   {
+    name: 'pluginInventory/changed',
+    mode: 'emit',
+    signature: '\'pluginInventory/changed\'(entryId: PluginEntryId, enabled: boolean): void',
+    summary: 'One entry\'s configured enablement changed through the inventory Remote.',
+    description: 'One entry\'s configured enablement changed through the inventory Remote. Emitted after the Loader applied the change and the profile patch layer persisted it, so a listener that re-reads the inventory observes the new state. Never emitted for a rejected or no-op request.',
+    parameters: [{ name: 'entryId', description: 'the Loader entry whose enablement changed.' }, { name: 'enabled', description: 'the entry\'s new configured enablement.' }],
+  },
+  {
     name: 'session-telemetry/record',
     mode: 'waterfall',
     signature: '\'session-telemetry/record\'(record: SessionTelemetryRecord, next: () => SessionTelemetryRecord): SessionTelemetryRecord',
@@ -3452,6 +3460,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PermissionSelect',
     declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
+  },
+  {
+    name: 'PluginEntryId',
+    declaration: 'export type PluginEntryId = Branded<\'PluginEntryId\'>;',
   },
   {
     name: 'PostToolDecision',

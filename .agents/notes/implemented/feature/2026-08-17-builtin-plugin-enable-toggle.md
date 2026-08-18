@@ -1,0 +1,37 @@
+# Agent Note: Builtin plugin enable/disable from the Web GUI
+
+Status: implemented
+
+## Problem
+
+A builtin plugin can only be enabled or disabled by editing a profile's `cordis.patch.yml` by hand. The plugin-inventory Settings tab exposes the Loader's entry state read-only; turning a plugin off for a running deployment — the agent, a transport, a feature — required an edit, a restart, or both, with no guard against cutting off the very surface that issues the request. The seam was incomplete: the Host could project state but not mutate it, and the GUI had no affordance.
+
+## Decision
+
+`@deepseek-ai/dsh-host-plugin-inventory` gains a `setEnabled` Remote that turns one entry on or off, applies the change to the running Loader tree, and records it in the profile's own `cordis.patch.yml` so it survives a restart — no restart is needed and no second persistence path exists. The client renders a per-row checkbox in the Settings tab, gates DISABLE behind an acknowledgement, and applies ENABLE straight through.
+
+**Profile-scoped writes.** The override is written to the profile's own patch layer, never the machine-global home layer, because an entry id is an artifact of one profile's composition — recording it globally would apply it to profiles that never had the row. The absolute path arrives as the `dshPatchPath` launcher fact: `app-boot` exposes the slot through `providePatchPath`, `apps/cli/src/profile-boot.ts` provides it from `boot()`'s `prepare` hook before any entry mounts, and the web bundle wires it with `config: { patchPath: !!js dshPatchPath }`. The gateway's `Config.patchPath` is a required string, so a composition that mounts the gateway without the slot fails validation at load rather than discovering on the first toggle that it has nowhere to write.
+
+**One call, whole snapshot.** `setEnabled(entryId, enabled)` resolves the entry, applies the Loader change first (`entry.update({ disabled: !enabled })`), records the override, emits `pluginInventory/changed`, and returns the whole refreshed `PluginInventorySnapshot` rather than an acknowledgement. The Loader change lands first because a refused patch write leaves a tree that no longer matches disk, which the raised failure reports, whereas writing first would persist an override the running process rejected. The client applies the returned snapshot directly, no refetch.
+
+**Brick guard.** `PROTECTED_MODULES` is a fixed `ReadonlySet` of module specifiers the browser needs to reach this Remote and re-enable what it just disabled: the command channel from the browser to the Host (web server, API gateway, Typert registry, forwarded-event assembly, browser transport, client runtime) plus the Settings surface the request issues from and the inventory projection itself. A disable request for one of those is refused with `PLUGIN_PROTECTED`. Everything else stays disableable — a user who turns off the agent still has a Settings tab that turns it back on — and recovery from any state remains possible by editing the profile file directly, so the guard's job is only to keep the graphical surface from destroying its own undo path. It is a security invariant, not a tunable, so a deployment cannot widen or empty it.
+
+**Refused, not overridden.** Each entry publishes a closed `toggle` union — `available` | `protected` | `inherited` | `expression` — computed from the live Loader entry. A row whose effective state is owned by a disabled ancestor group (`inherited`) or computed by a `!!js` config expression (`expression`) refuses the request, because a literal override would destroy the rule or change nothing. A protected entry that is already disabled reports `available`, since re-enabling restores the channel the guard exists to keep.
+
+**Comment-preserving id-targeted upsert.** The patch writer edits the profile's `cordis.patch.yml` directly through a parsed YAML `Document`, updating the single row whose `id` matches and leaving comments and every untouched row verbatim; an absent file is born as a sequence. The write records `{ id, name, disabled }` so `applyEntryPatches`' name-mismatch skip means an orphaned patch never disables the wrong plugin, and persists under `withFileLock` + `writeFileAtomic` (mode `0o600`, dirMode `0o700`). This bypasses the Loader's own `EntryTree.update()`, which rewrites the whole composed entry list materialized over the leaf `cordis.yml`; a user override belongs in the layer the user owns.
+
+**Transport and client.** `pluginInventory/changed` is one entry in `API_REMOTE_FORWARDED_EVENTS`, and the client `subscribe(listener)` wraps `ctx.remote.$on` so external patch-file edits re-read the inventory. The toggle row's `switch (toggle)` ends in `assertNever` on the closed union; a rejected or no-op request emits no event, and a request that changes nothing returns the unchanged inventory.
+
+## Alternatives considered
+
+**Write to the machine-global `~/.dsh` home layer.** The natural place a Host has already resolved, and the cheapest to reach — but entry ids are artifacts of one profile's composition, so a globally recorded override would apply to profiles that never had the row, or silently shadow the profile layer's own copy. The launcher fact exists precisely to make the write profile-scoped.
+
+**Deep-merge the patch instead of an id-targeted replace.** A merge would apply an override even when the row's `name` no longer matches, risking disabling the wrong plugin after a rename; the id-targeted upsert with a name-checked row preserves neighbouring rows and keeps an orphaned patch inert.
+
+**Restart-to-apply.** Persisting the file and letting a restart pick it up is simpler and shares the Loader's own path — but the runtime application is the feature's point, and `entry.update({ disabled })` applies the change live without the destructive whole-tree rewrite that makes a restart necessary. The override is still persisted, so both the immediate effect and the durable one are covered.
+
+**Let the client resolve the patch path itself.** The gateway could compute or guess the profile file from the Host home and environment. Rejected because the path is a launcher fact owned by the boot wiring, not something a plugin should rediscover; `boot()` provides it from `prepare` before entries mount, and a wrong guess surfaces only as a failed write at toggle time instead of a loud load-time validation failure.
+
+## Consequences
+
+A builtin plugin can be enabled and disabled from the GUI, applied immediately, and stays that way across restarts through a persisted profile override. The write stays out of the composed tree, so a toggle never rewrites the bundle's `cordis.yml`. The brick guard keeps the browser's control channel and settings surface intact at the cost of refusing some legitimate-looking disables, which the UI explains per row. Rows owned by an ancestor group or a config expression cannot be toggled here, preserving those rules. The client gates only the destructive direction — DISABLE requires an acknowledgement, ENABLE does not — so an accidental disable needs an explicit confirmation while re-enabling stays friction-free.

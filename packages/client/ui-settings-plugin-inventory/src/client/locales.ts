@@ -20,6 +20,17 @@ export const zh = {
   active: '已挂载',
   failed: '挂载失败',
   unloading: '卸载中',
+  toggleLabel: '插件开关',
+  toggleProtected: '浏览器界面依赖此插件，无法停用。',
+  toggleInherited: '由上级分组停用，不由本行控制。',
+  toggleExpression: '启用状态由配置表达式计算，在此修改会破坏该规则。',
+  saving: '正在应用…',
+  mutationError: '更改未能应用。',
+  confirmTitle: '停用插件？',
+  confirmDescription: '停用后插件会立即停止，并在重启后保持停用。',
+  confirmAcknowledge: '我了解停用的影响。',
+  confirmCancel: '取消',
+  confirmDisable: '停用',
 } satisfies Record<string, string>
 
 /** Plugin inventory locale key union. */
@@ -45,4 +56,15 @@ export const en = {
   active: 'Mounted',
   failed: 'Mount failed',
   unloading: 'Unloading',
+  toggleLabel: 'Enable this plugin',
+  toggleProtected: 'This plugin cannot be disabled because the browser UI depends on it.',
+  toggleInherited: 'Disabled by an ancestor group, not by this row.',
+  toggleExpression: 'Enablement is computed by a config expression; editing it here would destroy that rule.',
+  saving: 'Applying…',
+  mutationError: 'The change could not be applied.',
+  confirmTitle: 'Disable plugin?',
+  confirmDescription: 'Disabling stops the plugin immediately and it stays off after restart.',
+  confirmAcknowledge: 'I understand the impact of disabling.',
+  confirmCancel: 'Cancel',
+  confirmDisable: 'Disable',
 } satisfies Record<PluginInventoryLocaleKey, string>

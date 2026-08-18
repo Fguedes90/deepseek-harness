@@ -74,6 +74,9 @@ import type {} from '@deepseek-ai/dsh-commands'
 // merges `ctx.dynamicCordisRunner`, and a dependency on that package would
 // rebuild the api-remotes cycle this direction exists to avoid.
 import type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
+// Type-only: the plugin inventory's forwarded-event declaration. Client-safe
+// `./types` subpath, for the same reason as the runner above.
+import type {} from '@deepseek-ai/dsh-host-plugin-inventory/types'
 import type {} from '@deepseek-ai/dsh-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either

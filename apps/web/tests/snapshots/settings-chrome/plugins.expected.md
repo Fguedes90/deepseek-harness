@@ -1,4 +1,5 @@
 - listitem:
+  - checkbox "插件开关" [checked] [disabled]
   - button "ui-settings, 已挂载, 已启用":
     - strong: ui-settings
     - img "已挂载"
