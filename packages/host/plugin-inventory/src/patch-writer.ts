@@ -39,7 +39,10 @@ export interface PluginPatchRow {
  * @param row - the override to record.
  * @returns the text to persist.
  * @throws {PluginInventoryError} `PATCH_WRITE_FAILED` when the existing file is
- * not a YAML sequence, which is the only shape a patch layer may have.
+ * not a YAML sequence, which is the only shape a patch layer may have, or when
+ * it repeats one row id — a hand-edit must make ids unique before an override
+ * can bind, and silently updating only the first row would leave the duplicate
+ * to fight the real value on the next boot.
  */
 export function renderPatchDocument(text: string | undefined, row: PluginPatchRow): string {
   const document = text === undefined ? new Document([]) : parseDocument(text)
@@ -61,7 +64,14 @@ export function renderPatchDocument(text: string | undefined, row: PluginPatchRo
     )
   }
   seq.flow = false
-  const existing = seq.items.find(item => isMap(item) && item.get('id') === row.id)
+  const matches = seq.items.filter(item => isMap(item) && item.get('id') === row.id)
+  if (matches.length > 1) {
+    throw new PluginInventoryError(
+      `the profile patch layer repeats the row id "${row.id}"; a hand-edit must make ids unique before an override can bind`,
+      'PATCH_WRITE_FAILED',
+    )
+  }
+  const existing = matches[0]
   if (isMap(existing)) {
     existing.set('name', row.name)
     existing.set('disabled', row.disabled)

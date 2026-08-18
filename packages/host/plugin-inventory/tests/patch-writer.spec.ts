@@ -84,6 +84,20 @@ describe('renderPatchDocument', () => {
     expect(() => renderPatchDocument('id: probe\n', { id: 'probe', name: 'pkg', disabled: true }))
       .toThrow(/top-level YAML array/)
   })
+
+  it('refuses a layer that repeats one row id, instead of silently editing the first', () => {
+    const current = [
+      '- id: probe',
+      '  name: pkg-a',
+      '  disabled: false',
+      '- id: probe',
+      '  name: pkg-b',
+      '  disabled: false',
+      '',
+    ].join('\n')
+    expect(() => renderPatchDocument(current, { id: 'probe', name: 'pkg', disabled: true }))
+      .toThrow(/PATCH_WRITE_FAILED|repeats the row id/)
+  })
 })
 
 describe('writePluginPatch', () => {

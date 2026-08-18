@@ -102,8 +102,11 @@ describe('web e2e: settings modal and General preferences', () => {
     await dialog.getByRole('tab', { name: '插件列表', exact: true }).click()
     const pluginRow = dialog.locator(PLUGIN_ROW_SELECTOR)
     await pluginRow.waitFor({ timeout: 10_000 })
+    // The tab lists exactly the rows the profile's patch layer can override:
+    // non-group entries composed one level below the root Include.
     const expectedPluginCount = [...scaffold.ctx.loader.entries()]
-      .filter(entry => !entry.options.group)
+      .filter(entry => !entry.options.group && entry.subtree === undefined)
+      .filter(entry => entry.id.split(':').length === 2)
       .length
     expect(await dialog.getByRole('searchbox', { name: '搜索插件' }).count()).toBe(1)
     expect(await dialog.locator('[data-plugin-entry]').count()).toBe(expectedPluginCount)

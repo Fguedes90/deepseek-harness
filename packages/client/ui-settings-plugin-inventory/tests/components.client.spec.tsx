@@ -142,7 +142,7 @@ describe('PluginInventorySettingsTab', () => {
     await act(async () => { deferredFailure.reject(new Error('late failure')) })
   })
 
-  it('enables a disabled plugin immediately with the returned snapshot and no refetch', async () => {
+  it('applies the returned snapshot in place to update the toggled row', async () => {
     const list = vi.fn<PluginInventorySettingsTabInjected['list']>().mockResolvedValue(SNAPSHOT)
     const enabled = {
       ...SNAPSHOT,
@@ -161,6 +161,9 @@ describe('PluginInventorySettingsTab', () => {
     expect(setEnabled).toHaveBeenCalledWith('disabled-entry', true)
     expect(screen.queryByText(en.confirmTitle)).toBeNull()
     await waitFor(() => { expect(checkboxOf('disabled-entry').checked).toBe(true) })
+    // `subscribe` is a never-firing no-op here, so the forwarded-change reload
+    // path is not exercised (it is covered by the dedicated reload test); this
+    // only proves applying the resolved snapshot needs no fresh read.
     expect(list).toHaveBeenCalledTimes(1)
   })
 
@@ -185,6 +188,50 @@ describe('PluginInventorySettingsTab', () => {
     })
     expect(screen.queryByText(en.saving)).toBeNull()
     expect(checkboxOf('disabled-entry').disabled).toBe(false)
+  })
+
+  it('keeps each row\'s saving state independent while toggles overlap', async () => {
+    const snapshot = {
+      entries: [
+        { entryId: 'a', moduleName: '@fixture/a', enabled: false, fiberPhase: null, toggle: 'available' },
+        { entryId: 'b', moduleName: '@fixture/b', enabled: false, fiberPhase: null, toggle: 'available' },
+      ],
+    } as unknown as Snapshot
+    const first = Promise.withResolvers<Snapshot>()
+    const second = Promise.withResolvers<Snapshot>()
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    render(<PluginInventorySettingsTab {...props(async () => snapshot, { setEnabled })} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    fireEvent.click(checkboxOf('a'))
+    fireEvent.click(checkboxOf('b'))
+    expect(checkboxOf('a').disabled).toBe(true)
+    expect(checkboxOf('b').disabled).toBe(true)
+    expect(screen.getAllByText(en.saving)).toHaveLength(2)
+
+    // Resolving only row a must not clear row b's in-flight state.
+    await act(async () => {
+      first.resolve({
+        ...snapshot,
+        entries: snapshot.entries.map(entry =>
+          entry.entryId === 'a' ? { ...entry, enabled: true } : entry),
+      })
+    })
+    expect(checkboxOf('a').disabled).toBe(false)
+    expect(checkboxOf('b').disabled).toBe(true)
+    expect(screen.getAllByText(en.saving)).toHaveLength(1)
+
+    await act(async () => {
+      second.resolve({
+        ...snapshot,
+        entries: snapshot.entries.map(entry =>
+          entry.entryId === 'b' ? { ...entry, enabled: true } : entry),
+      })
+    })
+    expect(checkboxOf('b').disabled).toBe(false)
+    expect(screen.queryByText(en.saving)).toBeNull()
   })
 
   it('gates a disable behind RiskConfirmation until acknowledged and confirmed', async () => {

@@ -102,4 +102,23 @@ describe('enablement over a real bundle-plus-patch composition', () => {
     expect(third.inventory.list().entries.find(entry => entry.moduleName === 'cordis:probe'))
       .toMatchObject({ enabled: true })
   })
+
+  it('keeps the composing Include and runtime rows out of the projection', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-plugin-composition-'))
+    writeFileSync(join(dir, 'cordis.yml'), LEAF_CONFIG)
+    const patchPath = join(dir, 'cordis.patch.yml')
+    writeFileSync(patchPath, PATCH_TEMPLATE)
+
+    const booted = await boot(dir, patchPath)
+    const runtimeId = await booted.ctx.loader.create({ name: 'cordis:probe' })
+
+    const listed = booted.inventory.list().entries.map(entry => entry.entryId)
+    expect(listed).toEqual(['include:probe'])
+
+    await expect(booted.inventory.setEnabled('include' as PluginEntryId, false))
+      .rejects.toMatchObject({ code: 'ENTRY_NOT_FOUND' })
+    await expect(booted.inventory.setEnabled(runtimeId as PluginEntryId, false))
+      .rejects.toMatchObject({ code: 'ENTRY_NOT_FOUND' })
+    expect(booted.ctx.loader.resolve('include').fiber).toBeDefined()
+  })
 })

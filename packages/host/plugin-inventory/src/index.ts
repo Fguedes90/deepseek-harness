@@ -1,7 +1,7 @@
 /** Projection of the current Cordis Loader plugin entries, and the enablement override that edits it. */
 
 import type { Context, FiberState } from '@deepseek-ai/cordis'
-import { isJsExpr, type Entry } from '@deepseek-ai/cordis-plugin-loader'
+import { EntryTree, isJsExpr, type Entry } from '@deepseek-ai/cordis-plugin-loader'
 import z from '@deepseek-ai/schemastery'
 import { assertNever } from '@deepseek-ai/dsh-llm'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
@@ -65,6 +65,26 @@ function toggleStateOf(entry: Entry): PluginToggleState {
   return 'available'
 }
 
+/**
+ * Whether this entry is a row the profile's patch layer can bind an override
+ * to, which is also the only kind this seam publishes.
+ *
+ * `applyEntryPatches` targets rows by their own id inside the entry list the
+ * root Include composed, so exactly the entries one level below that Include
+ * are addressable. Everything else the Loader carries is either structure or
+ * unrecordable: the Include entry itself owns the whole composed subtree and
+ * disposing it would take this service down with the surface that called it;
+ * a row created at runtime through `ctx.loader.create` sits in the Loader's
+ * own store under a generated id that no file records; and a nested Include's
+ * children carry a deeper prefix that the profile's patch list never reaches.
+ * @param entry - the live Loader entry.
+ * @returns true when a recorded override for this entry would bind on the next boot.
+ */
+function isConfiguredRow(entry: Entry): boolean {
+  if (entry.options.group || entry.subtree !== undefined) return false
+  return entry.id.split(EntryTree.sep).length === 2
+}
+
 /** Required launcher fact: which file records this deployment's user overrides. */
 export interface Config {
   /**
@@ -91,6 +111,13 @@ export class PluginInventoryGateway extends TypertRemoteService {
   private readonly patchPath: string
 
   /**
+   * Tail of the serialized `setEnabled` chain. Two toggles that interleaved
+   * would order their tree updates independently of their file writes, so the
+   * last write could record a state the live tree no longer holds.
+   */
+  private queue: Promise<unknown> = Promise.resolve()
+
+  /**
    * @param ctx - Host context carrying the Loader service.
    * @param config - Required profile patch-layer destination.
    */
@@ -103,13 +130,13 @@ export class PluginInventoryGateway extends TypertRemoteService {
    * Read the Loader directly on every call. Cordis's internal plugin/status
    * events already maintain Entry.fiber and Fiber.state, so a second cache
    * would only add another lifecycle truth to keep synchronized.
-   * @returns Current non-group Loader entries in Loader order.
+   * @returns Current configured plugin rows in Loader order.
    */
   @Remote('list')
   list(): PluginInventorySnapshot {
     const entries: PluginInventoryEntry[] = []
     for (const entry of this.ctx.loader.entries()) {
-      if (entry.options.group) continue
+      if (!isConfiguredRow(entry)) continue
       entries.push({
         entryId: pluginEntryId(entry.id),
         moduleName: entry.options.name,
@@ -125,17 +152,28 @@ export class PluginInventoryGateway extends TypertRemoteService {
    * Set one entry's configured enablement, applying it to the running tree and
    * recording it in the profile's patch layer so it survives a restart.
    *
-   * The Loader change lands first: a refused write leaves a tree that no
-   * longer matches disk, which the raised failure reports, whereas writing
-   * first would persist an override the running process rejected.
+   * One toggle at a time: the whole resolve, guard, update and write sequence
+   * runs on a single chain, so a second request reads the state the first one
+   * left. A rejected request changes nothing - a failed write rolls the tree
+   * back, because the alternative is a process whose live state no file
+   * records and whose retry the no-op check would answer with a false success.
    * @param entryId - the Loader entry to change.
    * @param enabled - the enablement to configure.
    * @returns the whole inventory as it stands after the change.
    * @throws {PluginInventoryError} `ENTRY_NOT_FOUND`, `PLUGIN_PROTECTED`,
-   * `TOGGLE_INHERITED`, `TOGGLE_EXPRESSION`, or `PATCH_WRITE_FAILED`.
+   * `TOGGLE_INHERITED`, `TOGGLE_EXPRESSION`, or `PATCH_WRITE_FAILED`; a
+   * rollback that fails in turn raises the Loader's own error instead.
    */
   @Remote('setEnabled')
   async setEnabled(entryId: PluginEntryId, enabled: boolean): Promise<PluginInventorySnapshot> {
+    const settled = this.queue.then(() => this.applyEnablement(entryId, enabled))
+    // The chain only orders calls; every caller still receives its own outcome.
+    this.queue = settled.then(() => {}, () => {})
+    return settled
+  }
+
+  /** One serialized toggle: guard the request, move the tree, record it. */
+  private async applyEnablement(entryId: PluginEntryId, enabled: boolean): Promise<PluginInventorySnapshot> {
     const entry = this.resolveEntry(entryId)
     const state = toggleStateOf(entry)
     switch (state) {
@@ -164,12 +202,20 @@ export class PluginInventoryGateway extends TypertRemoteService {
     }
     if (!entry.disabled === enabled) return this.list()
 
+    // Absent and `null` are the same enabled state to the Loader, so a row that
+    // never carried the key rolls back to the explicit `null`.
+    const previous = entry.options.disabled ?? null
     await entry.update({ disabled: !enabled })
-    await writePluginPatch(this.patchPath, {
-      id: entry.options.id,
-      name: entry.options.name,
-      disabled: !enabled,
-    })
+    try {
+      await writePluginPatch(this.patchPath, {
+        id: entry.options.id,
+        name: entry.options.name,
+        disabled: !enabled,
+      })
+    } catch (failure) {
+      await entry.update({ disabled: previous })
+      throw failure
+    }
     this.ctx.emit('pluginInventory/changed', entryId, enabled)
     return this.list()
   }
@@ -182,8 +228,11 @@ export class PluginInventoryGateway extends TypertRemoteService {
     } catch (cause) {
       throw new PluginInventoryError(`no loader entry ${entryId}`, 'ENTRY_NOT_FOUND', { cause })
     }
-    if (entry.options.group) {
-      throw new PluginInventoryError(`loader entry ${entryId} is a group, not a plugin`, 'ENTRY_NOT_FOUND')
+    if (!isConfiguredRow(entry)) {
+      throw new PluginInventoryError(
+        `loader entry ${entryId} is not a configured plugin row this profile can override`,
+        'ENTRY_NOT_FOUND',
+      )
     }
     return entry
   }

@@ -97,7 +97,10 @@ export function PluginInventorySettingsTab({
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<PluginInventoryEntry['entryId'] | null>(null)
   const [state, setState] = useState<ViewState>({ status: 'loading' })
-  const [pending, setPending] = useState<PluginInventoryEntry['entryId'] | null>(null)
+  // In-flight toggle entry ids, so concurrent toggles keep their own per-row
+  // saving tag and disabled state instead of sharing one slot that the first
+  // resolution would clear for every row.
+  const [pending, setPending] = useState<ReadonlySet<PluginInventoryEntry['entryId']>>(() => new Set())
   const [confirming, setConfirming] = useState<PluginInventoryEntry['entryId'] | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
   const [mutationError, setMutationError] = useState(false)
@@ -142,18 +145,25 @@ export function PluginInventorySettingsTab({
   }
 
   const applyToggle = (entryId: PluginInventoryEntry['entryId'], enabled: boolean): void => {
+    const settle = (): void => {
+      setPending((current) => {
+        const next = new Set(current)
+        next.delete(entryId)
+        return next
+      })
+    }
     setMutationError(false)
     setFailedEntry(null)
-    setPending(entryId)
+    setPending(current => new Set(current).add(entryId))
     void Promise.resolve().then(() => setEnabled(entryId, enabled)).then(
       (snapshot) => {
         if (!mounted.current) return
-        setPending(null)
+        settle()
         setState({ status: 'ready', snapshot })
       },
       () => {
         if (!mounted.current) return
-        setPending(null)
+        settle()
         setFailedEntry(entryId)
         setMutationError(true)
       },
@@ -216,7 +226,7 @@ export function PluginInventorySettingsTab({
                 const open = expanded === entry.entryId
                 const detailId = `${catalogId}-details-${encodeURIComponent(entry.entryId)}`
                 const reason = toggleReasonKey(entry.toggle)
-                const isPending = pending === entry.entryId
+                const isPending = pending.has(entry.entryId)
                 const controlDisabled = reason !== null || isPending
                 return (
                   <li
@@ -306,7 +316,7 @@ export function PluginInventorySettingsTab({
         cancelLabel={t('confirmCancel')}
         confirmLabel={t('confirmDisable')}
         acknowledged={acknowledged}
-        disabled={pending !== null}
+        disabled={pending.size !== 0}
         onAcknowledgedChange={setAcknowledged}
         onCancel={cancelConfirmation}
         onConfirm={confirmDisable}
