@@ -115,6 +115,34 @@
   list-style: none;
 }
 
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group + .group {
+  margin-top: 14px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.groupHead span {
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 .card {
   display: flex;
   flex-wrap: wrap;
@@ -182,6 +210,14 @@
   outline-offset: -2px;
 }
 
+.cardText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .cardTitle {
   min-width: 0;
   overflow: hidden;
@@ -190,6 +226,18 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cardSummary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 17px;
 }
 
 .cardTrailing {

@@ -6,7 +6,9 @@ import {
   RiskConfirmation,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { PluginInventoryLocaleKey } from './locales.ts'
+import { categoryKey, summaryKey, type PluginInventoryLocaleKey } from './locales.ts'
+import { CATEGORY_ORDER, categoryOf, isCatalogModule } from './catalog.ts'
+import type { PluginCategory } from './catalog.ts'
 import css from './PluginInventorySettingsTab.module.css'
 
 /** Registration-side Remote face used by the section. */
@@ -78,11 +80,25 @@ function moduleShortName(moduleName: string): string {
     .replace(/^dsh-(?:host-|client-)?/, '')
 }
 
-/** Whether an inventory row matches the local catalog query. */
-function matches(entry: PluginInventoryEntry, normalizedQuery: string): boolean {
+/**
+ * Whether an inventory row matches the local catalog query.
+ *
+ * A row matches on its module specifier, Loader entry id, category label, and (when this
+ * package describes it) its localized summary, so search works in the displayed language.
+ */
+function matches(
+  entry: PluginInventoryEntry,
+  normalizedQuery: string,
+  t: PluginInventorySettingsTabProps['t'],
+): boolean {
   if (normalizedQuery.length === 0) return true
-  return [entry.moduleName, entry.entryId]
-    .some(value => value.toLocaleLowerCase().includes(normalizedQuery))
+  const targets = [
+    entry.moduleName,
+    entry.entryId,
+    t(categoryKey(categoryOf(entry.moduleName))),
+    ...(isCatalogModule(entry.moduleName) ? [t(summaryKey(entry.moduleName))] : []),
+  ]
+  return targets.some(value => value.toLocaleLowerCase().includes(normalizedQuery))
 }
 
 /** Render the current Loader inventory with an enable/disable toggle per row. */
@@ -128,10 +144,24 @@ export function PluginInventorySettingsTab({
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const filteredEntries = useMemo(
     () => state.status === 'ready'
-      ? state.snapshot.entries.filter(entry => matches(entry, normalizedQuery))
+      ? state.snapshot.entries.filter(entry => matches(entry, normalizedQuery, t))
       : [],
-    [normalizedQuery, state],
+    [normalizedQuery, state, t],
   )
+
+  // Preserve the Loader's row order inside each category; the render pass walks
+  // `CATEGORY_ORDER` and skips a category whose entries were all filtered out.
+  // The one `[data-plugin-count]` below keeps reporting the filtered total, so
+  // the per-section counts stay presentation-only.
+  const grouped = useMemo(() => {
+    const byCategory = new Map<PluginCategory, PluginInventoryEntry[]>()
+    for (const entry of filteredEntries) {
+      const list = byCategory.get(categoryOf(entry.moduleName))
+      if (list !== undefined) list.push(entry)
+      else byCategory.set(categoryOf(entry.moduleName), [entry])
+    }
+    return byCategory
+  }, [filteredEntries])
 
   useEffect(() => {
     if (expanded !== null && !filteredEntries.some(entry => entry.entryId === expanded)) {
@@ -218,93 +248,116 @@ export function PluginInventorySettingsTab({
             ? <p className={css.status}>{t('emptySearch')}</p>
             : null}
           {filteredEntries.length > 0 ? (
-            <ul className={css.cards}>
-              {filteredEntries.map((entry) => {
-                const status = phaseLabel(entry.fiberPhase, t)
-                const title = moduleShortName(entry.moduleName)
-                const configuration = t(entry.enabled ? 'enabledTag' : 'disabledTag')
-                const open = expanded === entry.entryId
-                const detailId = `${catalogId}-details-${encodeURIComponent(entry.entryId)}`
-                const reason = toggleReasonKey(entry.toggle)
-                const isPending = pending.has(entry.entryId)
-                const controlDisabled = reason !== null || isPending
-                return (
-                  <li
-                    className={css.card}
-                    key={entry.entryId}
-                    data-plugin-entry={entry.entryId}
-                    data-open={open ? 'true' : undefined}
-                    data-saving={isPending ? 'true' : undefined}
-                    data-failed={failedEntry === entry.entryId ? 'true' : undefined}
-                  >
-                    <input
-                      className={css.toggle}
-                      type="checkbox"
-                      checked={entry.enabled}
-                      disabled={controlDisabled}
-                      aria-label={t('toggleLabel')}
-                      aria-description={reason === null ? undefined : t(reason)}
-                      aria-busy={isPending ? 'true' : undefined}
-                      onChange={() => {
-                        /* v8 ignore next -- non-available rows render a disabled control, which cannot raise a change event. */
-                        if (reason !== null) return
-                        if (entry.enabled) {
-                          setAcknowledged(false)
-                          setConfirming(entry.entryId)
-                        } else {
-                          applyToggle(entry.entryId, true)
-                        }
-                      }}
-                    />
-                    <button
-                      className={css.cardContent}
-                      type="button"
-                      aria-expanded={open}
-                      aria-controls={detailId}
-                      aria-label={entry.enabled ? `${title}, ${status}, ${configuration}` : `${title}, ${configuration}`}
-                      onClick={() => {
-                        setExpanded(current => current === entry.entryId ? null : entry.entryId)
-                      }}
-                    >
-                      <strong className={css.cardTitle} title={entry.moduleName}>{title}</strong>
-                      <span className={css.cardTrailing}>
-                        {entry.enabled ? (
-                          <span
-                            className={css.statusDot}
-                            data-phase={entry.fiberPhase ?? 'unobserved'}
-                            role="img"
-                            aria-label={status}
-                            title={status}
+            CATEGORY_ORDER.map((category) => {
+              const categoryEntries = grouped.get(category) ?? []
+              if (categoryEntries.length === 0) return null
+              return (
+                <section className={css.group} key={category}>
+                  <h3 className={css.groupHead}>
+                    {t(categoryKey(category))}
+                    <span>{categoryEntries.length}</span>
+                  </h3>
+                  <ul className={css.cards}>
+                    {categoryEntries.map((entry) => {
+                      const status = phaseLabel(entry.fiberPhase, t)
+                      const title = moduleShortName(entry.moduleName)
+                      const configuration = t(entry.enabled ? 'enabledTag' : 'disabledTag')
+                      const open = expanded === entry.entryId
+                      const detailId = `${catalogId}-details-${encodeURIComponent(entry.entryId)}`
+                      const reason = toggleReasonKey(entry.toggle)
+                      const isPending = pending.has(entry.entryId)
+                      const controlDisabled = reason !== null || isPending
+                      return (
+                        <li
+                          className={css.card}
+                          key={entry.entryId}
+                          data-plugin-entry={entry.entryId}
+                          data-open={open ? 'true' : undefined}
+                          data-saving={isPending ? 'true' : undefined}
+                          data-failed={failedEntry === entry.entryId ? 'true' : undefined}
+                        >
+                          <input
+                            className={css.toggle}
+                            type="checkbox"
+                            checked={entry.enabled}
+                            disabled={controlDisabled}
+                            aria-label={t('toggleLabel')}
+                            aria-description={reason === null ? undefined : t(reason)}
+                            aria-busy={isPending ? 'true' : undefined}
+                            onChange={() => {
+                              /* v8 ignore next -- non-available rows render a disabled control, which cannot raise a change event. */
+                              if (reason !== null) return
+                              if (entry.enabled) {
+                                setAcknowledged(false)
+                                setConfirming(entry.entryId)
+                              } else {
+                                applyToggle(entry.entryId, true)
+                              }
+                            }}
                           />
-                        ) : null}
-                        <span className={css.configTag} data-enabled={entry.enabled ? 'true' : 'false'}>
-                          {configuration}
-                        </span>
-                        {isPending ? <span className={css.savingTag}>{t('saving')}</span> : null}
-                        <IconChevronDownOutline14 className={css.chevron} size={12} aria-hidden="true" />
-                      </span>
-                    </button>
-                    {open ? (
-                      <div className={css.cardDetails} id={detailId}>
-                        <code className={css.entryValue} data-loader-entry>{entry.entryId}</code>
-                        <dl className={css.details}>
-                          <div>
-                            <dt>{t('configuration')}</dt>
-                            <dd>{configuration}</dd>
-                          </div>
-                          {entry.enabled ? (
-                            <div>
-                              <dt>{t('cordis')}</dt>
-                              <dd>{status}</dd>
+                          <button
+                            className={css.cardContent}
+                            type="button"
+                            aria-expanded={open}
+                            aria-controls={detailId}
+                            aria-label={entry.enabled ? `${title}, ${status}, ${configuration}` : `${title}, ${configuration}`}
+                            onClick={() => {
+                              setExpanded(current => current === entry.entryId ? null : entry.entryId)
+                            }}
+                          >
+                            <span className={css.cardText}>
+                              <strong className={css.cardTitle} title={entry.moduleName}>{title}</strong>
+                              {isCatalogModule(entry.moduleName) ? (
+                                <span className={css.cardSummary} title={t(summaryKey(entry.moduleName))}>
+                                  {t(summaryKey(entry.moduleName))}
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className={css.cardTrailing}>
+                              {entry.enabled ? (
+                                <span
+                                  className={css.statusDot}
+                                  data-phase={entry.fiberPhase ?? 'unobserved'}
+                                  role="img"
+                                  aria-label={status}
+                                  title={status}
+                                />
+                              ) : null}
+                              <span className={css.configTag} data-enabled={entry.enabled ? 'true' : 'false'}>
+                                {configuration}
+                              </span>
+                              {isPending ? <span className={css.savingTag}>{t('saving')}</span> : null}
+                              <IconChevronDownOutline14 className={css.chevron} size={12} aria-hidden="true" />
+                            </span>
+                          </button>
+                          {open ? (
+                            <div className={css.cardDetails} id={detailId}>
+                              <code className={css.entryValue} data-loader-entry>{entry.entryId}</code>
+                              <dl className={css.details}>
+                                <div>
+                                  <dt>{t('module')}</dt>
+                                  <dd><code>{entry.moduleName}</code></dd>
+                                </div>
+                                <div>
+                                  <dt>{t('configuration')}</dt>
+                                  <dd>{configuration}</dd>
+                                </div>
+                                {entry.enabled ? (
+                                  <div>
+                                    <dt>{t('cordis')}</dt>
+                                    <dd>{status}</dd>
+                                  </div>
+                                ) : null}
+                              </dl>
                             </div>
                           ) : null}
-                        </dl>
-                      </div>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              )
+            })
           ) : null}
         </div>
       ) : null}

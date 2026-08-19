@@ -28,11 +28,13 @@
     - searchbox "搜索插件": repeat-tool-reminder
     - heading "插件列表" [level=3]
     - text: "1"
+    - heading "系统与运行时 1" [level=3]
     - list:
       - listitem:
         - checkbox "插件开关" [checked]
         - button "repeat-tool-reminder, 已挂载, 已启用":
           - strong: repeat-tool-reminder
+          - text: 提醒助手停止重复相同操作并换个思路
           - img "已挂载"
           - text: 已启用
           - img

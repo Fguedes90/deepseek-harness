@@ -6,16 +6,18 @@ import type {
   PluginInventorySettingsTabInjected,
   PluginInventorySettingsTabProps,
 } from '../src/client/PluginInventorySettingsTab.tsx'
-import { en, type PluginInventoryLocaleKey } from '../src/client/locales.ts'
+import { en, pt, summaryKey, type PluginInventoryLocaleKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 type Snapshot = Awaited<ReturnType<PluginInventorySettingsTabInjected['list']>>
 const t = ((key: PluginInventoryLocaleKey): string => en[key]) as PluginInventorySettingsTabProps['t']
+const ptT = ((key: PluginInventoryLocaleKey): string => pt[key]) as PluginInventorySettingsTabProps['t']
 
 function props(
   list: PluginInventorySettingsTabInjected['list'],
-  overrides: Partial<Pick<PluginInventorySettingsTabInjected, 'setEnabled' | 'subscribe'>> = {},
+  overrides: Partial<Pick<PluginInventorySettingsTabInjected, 'setEnabled' | 'subscribe'>>
+    & { t?: PluginInventorySettingsTabProps['t'] } = {},
 ): PluginInventorySettingsTabProps {
   return {
     t,
@@ -50,6 +52,16 @@ function checkboxOf(entryId: string): HTMLInputElement {
 }
 
 describe('PluginInventorySettingsTab', () => {
+  it('renders the Portuguese copy when the active locale is pt', async () => {
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, { t: ptT })} />)
+    const search = await screen.findByRole('searchbox', { name: pt.search })
+    expect(screen.getByRole('heading', { name: pt.catalog })).toBeTruthy()
+    // A catalog row exposes its pt summary; an undescribed row shows none.
+    expect(screen.getByText(pt[summaryKey('@deepseek-ai/cordis-plugin-hmr')])).toBeTruthy()
+    fireEvent.change(search, { target: { value: 'não existe' } })
+    expect(screen.getByText(pt.emptySearch)).toBeTruthy()
+  })
+
   it('renders runtime status only for enabled plugins', async () => {
     const deferred = Promise.withResolvers<Snapshot>()
     const list = vi.fn(() => deferred.promise)
@@ -110,6 +122,35 @@ describe('PluginInventorySettingsTab', () => {
     fireEvent.change(search, { target: { value: 'not-a-plugin' } })
     expect(screen.queryAllByRole('listitem')).toHaveLength(0)
     expect(screen.getByText(en.emptySearch)).toBeTruthy()
+  })
+
+  it('renders a summary for catalog rows and none for undescribed rows', async () => {
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT)} />)
+    await screen.findByRole('searchbox', { name: en.search })
+
+    // Only `@deepseek-ai/cordis-plugin-hmr` is described by the catalog; every
+    // `@fixture/*` and native host row is an undescribed third-party plugin.
+    const summary: PluginInventoryLocaleKey = 'summary.@deepseek-ai/cordis-plugin-hmr'
+    expect(screen.getByText(en[summary])).toBeTruthy()
+    // The compact card clamps the sentence; hovering it reveals the full text.
+    expect(screen.getByText(en[summary]).getAttribute('title')).toBe(en[summary])
+    const trailing = screen.getByRole('button', { name: 'directory-picker-native, Disabled' })
+    expect(trailing.textContent).not.toContain(en[summary])
+  })
+
+  it('groups undescribed rows under the other category and search matches summaries', async () => {
+    render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT)} />)
+    const search = await screen.findByRole('searchbox', { name: en.search })
+
+    // The catalog row lands under System; the eight fixture rows under Other.
+    expect(screen.getByRole('heading', { name: /^System & runtime/ })).toBeTruthy()
+    const other = screen.getByRole('heading', { name: /^Other/ })
+    expect(other.textContent).toContain('8')
+
+    // Search the localized summary text of the one described row.
+    fireEvent.change(search, { target: { value: 'Reloads changed code automatically' } })
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByText('hmr')).toBeTruthy()
   })
 
   it('shows a generic failure and retries into the empty state', async () => {

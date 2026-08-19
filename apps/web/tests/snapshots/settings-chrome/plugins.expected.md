@@ -2,6 +2,7 @@
   - checkbox "插件开关" [checked] [disabled]
   - button "ui-settings, 已挂载, 已启用":
     - strong: ui-settings
+    - text: 为设置页面提供保存偏好的底层连接
     - img "已挂载"
     - text: 已启用
     - img
