@@ -25,6 +25,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Harness-home path resolver available to Loader `!!js` config expressions. */
     dshHomePath?: typeof dshHomePath
+    /** Absolute path of the profile's writable user patch layer, available to Loader `!!js` config expressions. */
+    dshPatchPath?: string
   }
 }
 
@@ -48,6 +50,21 @@ export {
   type ProfileLayer,
   type ProfileManifest,
 } from './profile.ts'
+
+/**
+ * Provide the absolute path of the profile's writable user patch layer on a
+ * host context as the `dshPatchPath` Loader `!!js` slot. A launcher fact,
+ * provided from `boot()`'s `prepare` hook before any config-tree entry mounts,
+ * so a plugin that persists user overrides receives a profile-scoped path
+ * rather than resolving one itself — entry ids are artifacts of that profile's
+ * composition, so the writable layer must be the profile's own file, not the
+ * machine-global home layer.
+ * @param ctx - the host context the tree will mount under.
+ * @param patchPath - the absolute path of the profile's `cordis.patch.yml`.
+ */
+export function providePatchPath(ctx: Context, patchPath: string): void {
+  ctx.provide('dshPatchPath', patchPath)
+}
 
 /**
  * Resolve the config to boot. Replay swaps a `cordis.yml` basename for

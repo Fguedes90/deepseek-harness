@@ -359,4 +359,29 @@ A pending Client activation request left the answerable state.
 ```
 
 Source: [`packages/extensions/cordis-host-runner/src/types.ts:373`](../../packages/extensions/cordis-host-runner/src/types.ts)
+
+<a id="plugininventory-events"></a>
+
+### `pluginInventory/*` events
+
+<a id="plugininventorychanged--emit"></a>
+
+#### `pluginInventory/changed` — emit
+
+One entry's configured enablement changed through the inventory Remote. Emitted after the Loader applied the change and the profile patch layer persisted it, so a listener that re-reads the inventory observes the new state. Never emitted for a rejected or no-op request.
+
+```ts cordis-catalog
+/**
+ * One entry's configured enablement changed through the inventory Remote.
+ * Emitted after the Loader applied the change and the profile patch layer
+ * persisted it, so a listener that re-reads the inventory observes the new
+ * state. Never emitted for a rejected or no-op request.
+ * @param entryId - the Loader entry whose enablement changed.
+ * @param enabled - the entry's new configured enablement.
+ * @mode emit
+ */
+'pluginInventory/changed'(entryId: PluginEntryId, enabled: boolean): void
+```
+
+Source: [`packages/host/plugin-inventory/src/types.ts:68`](../../packages/host/plugin-inventory/src/types.ts)
 <!-- END GENERATED cordis-surface -->

@@ -8,7 +8,7 @@ import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import {
   addHarnessSourceSection, assertEntriesActivated, assertEntriesLoaded, boot,
   FAIL_LOUD_RELEASE_TIMEOUT_MS, HARNESS_SOURCE_SECTION,
-  installFailLoud, loadEnv, loadLayeredEnv, loadOverlayPatches, resolveConfigPath, type FailLoudProcess,
+  installFailLoud, loadEnv, loadLayeredEnv, loadOverlayPatches, providePatchPath, resolveConfigPath, type FailLoudProcess,
 } from '../src/index.ts'
 
 const NAME = 'dsh-test-bin'
@@ -683,6 +683,34 @@ describe('boot', () => {
     } finally {
       await ctx?.fiber.dispose()
       vi.unstubAllEnvs()
+    }
+  })
+
+  it('exposes a provided dshPatchPath to Loader config expressions', async () => {
+    const dir = tmp()
+    const patchPath = join(dir, 'profiles', 'web', 'cordis.patch.yml')
+    writeFileSync(join(dir, 'capture.mjs'), [
+      'export const name = "capture"',
+      'export function apply(ctx, config) {',
+      '  ctx.provide("capturedPath", config.path)',
+      '}',
+      '',
+    ].join('\n'))
+    writeFileSync(join(dir, 'cordis.yml'), [
+      '- id: capture',
+      '  name: ./capture.mjs',
+      '  config:',
+      '    path: !!js dshPatchPath',
+      '',
+    ].join('\n'))
+    let ctx: Context | undefined
+    try {
+      ctx = await boot(NAME, join(dir, 'cordis.yml'), undefined, (hostCtx) => {
+        providePatchPath(hostCtx, patchPath)
+      })
+      expect(ctx.get('capturedPath')).toBe(patchPath)
+    } finally {
+      await ctx?.fiber.dispose()
     }
   })
 

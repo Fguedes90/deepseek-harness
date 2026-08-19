@@ -89,16 +89,30 @@ declare module '@deepseek-ai/cordis' {
 /** Fallback locale consulted after the active locale misses (also the last-resort initial locale). */
 export const FALLBACK_LOCALE: LocaleId = 'zh'
 
+/**
+ * Per-locale fallback for a dictionary miss. `pt` is the incrementally
+ * translated language: namespaces without a `pt` dictionary stay readable by
+ * falling back to `en` (never to `zh`, which would turn a partial PT UI into
+ * Chinese). `en` itself falls back to `zh`, which remains the last resort for
+ * `en`'s own gaps, keeping the historical zh default intact.
+ */
+const LOCALE_FALLBACK: Readonly<Record<LocaleId, LocaleId>> = {
+  zh: FALLBACK_LOCALE,
+  en: FALLBACK_LOCALE,
+  pt: 'en',
+}
+
 /** Shared namespace for shell-level texts. */
 export const COMMON_NS = 'common'
 
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.locale'
 
-/** The two shipped locales. */
+/** The shipped locales. */
 const LOCALES: readonly LocaleDefinition[] = Object.freeze([
   { id: 'zh', label: '中文' },
   { id: 'en', label: 'English' },
+  { id: 'pt', label: 'Português' },
 ])
 
 /**
@@ -196,15 +210,21 @@ export class LocaleRuntime {
    * Register a declared namespace's dictionaries, all locales in one call —
    * the typed form: each dictionary is checked against the namespace's
    * {@link LocaleNamespaceMap} key union (a missing or extra key is a
-   * compile error), and every shipped locale is required (bilingual balance
-   * enforced at registration). Duplicate (ns, locale) throws (single occupant; a
+   * compile error), and the zh/en pair is required (bilingual balance enforced
+   * at registration); `pt` is optional and falls back to `en` at lookup when
+   * absent. Duplicate (ns, locale) throws (single occupant; a
    * namespace's texts have one owner). Registration bumps the revision so
    * mounted outlets pick up late-arriving dictionaries.
    * @param ns - a namespace merged into LocaleNamespaceMap.
-   * @param dicts - complete dictionaries keyed by locale id.
+   * @param dicts - dictionaries per locale: `zh` and `en` are required
+   * (bilingual balance); `pt` is optional and, where absent, the translation
+   * falls back to `en` through the lookup chain rather than to `zh`.
    * @returns disposer removing every locale registered by this call (idempotent).
    */
-  register<N extends keyof LocaleNamespaceMap & string>(ns: N, dicts: Record<LocaleId, LocaleDictOf<N>>): () => void
+  register<N extends keyof LocaleNamespaceMap & string>(
+    ns: N,
+    dicts: { zh: LocaleDictOf<N>; en: LocaleDictOf<N>; pt?: LocaleDictOf<N> },
+  ): () => void
   /**
    * Single-locale untyped form for namespaces outside the merge table
    * (dynamic composition, tests).
@@ -283,7 +303,20 @@ export class LocaleRuntime {
 
   private lookup(ns: string, key: string): string | undefined {
     const locales = this.dicts.get(ns)
-    return locales?.get(this.snapshot.active)?.[key] ?? locales?.get(FALLBACK_LOCALE)?.[key]
+    // Active locale, then its per-locale fallback, then the historical zh
+    // last resort (pt -> en -> zh, en -> zh, zh). A chain that revisits a
+    // locale stops, so a self-fallback cannot loop forever.
+    const chain: LocaleId[] = []
+    let id: LocaleId = this.snapshot.active
+    for (let i = 0; i < LOCALES.length && !chain.includes(id); i += 1) {
+      chain.push(id)
+      id = LOCALE_FALLBACK[id]
+    }
+    for (const locale of chain) {
+      const value = locales?.get(locale)?.[key]
+      if (value !== undefined) return value
+    }
+    return undefined
   }
 
   /**

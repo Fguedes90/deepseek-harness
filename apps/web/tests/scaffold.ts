@@ -177,6 +177,8 @@ export interface WebScaffold {
   persistenceRoot: string
   /** Isolated harness home the settings/credentials rows write ($DSH_HOME double). */
   harnessHome: string
+  /** The profile patch layer the plugin inventory writes enablement overrides to. */
+  profilePatchPath: string
   /** Await a settled turn end: in-process turn/end, then the agent's idle flip (which follows the persistence flush). */
   whenTurnSettled(timeoutMs?: number): Promise<SessionId>
   /** Tear everything down; asserts the replay fixture was fully consumed first (replay/refresh). */
@@ -490,6 +492,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       : [{ id: 'llm-deepseek', disabled: true }],
   ]
 
+  // The profile the boot below composes over, and its writable patch layer:
+  // the launcher facts `boot()` resolves, kept inside the temp harness home.
+  const profileDir = join(harnessHome, 'profiles', 'scaffold')
+  const profilePatchPath = join(profileDir, 'cordis.patch.yml')
+
   // Sessions inherit the gateway's process.cwd() default; run the boot from
   // the temp workspace so tool cwd, session cwd, and fixtures agree.
   const originalCwd = process.cwd()
@@ -502,13 +509,16 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // harness home, with bare plugin names resolving through the flat module
     // fallback the launcher heals under <home>/profiles.
     healProfilesModuleFallback(INSTALL_ANCHOR, harnessHome)
-    const profileDir = join(harnessHome, 'profiles', 'scaffold')
     await mkdir(profileDir, { recursive: true })
     const rootConfig = join(profileDir, 'cordis.yml')
     await writeFile(rootConfig, '[]\n')
     ctx.baseUrl = pathToFileURL(profileDir).href + '/'
     // This direct Loader harness supplies the same root-path capability as app-boot.
     ctx.provide('dshHomePath', dshHomePath)
+    // The profile's writable patch layer, the same launcher fact `boot()`
+    // provides: the plugin inventory row records enablement overrides there,
+    // and this lane's profile directory keeps them inside the temp home.
+    ctx.provide('dshPatchPath', profilePatchPath)
     // A host with no command line still provides one: the web bundle's startup
     // row releases the rows waiting on it, and with no arguments each starts on
     // the values this scaffold composed above. An exit request can only come
@@ -581,6 +591,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
 
   return {
     harnessHome,
+    profilePatchPath,
     mode,
     baseUrl: `http://${browserHost}:${port}`,
     ctx,

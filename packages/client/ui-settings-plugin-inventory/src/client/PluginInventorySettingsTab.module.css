@@ -37,6 +37,12 @@
   cursor: pointer;
 }
 
+.mutationFailure {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .catalog {
   display: flex;
   flex-direction: column;
@@ -109,7 +115,38 @@
   list-style: none;
 }
 
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group + .group {
+  margin-top: 14px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.groupHead span {
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 .card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -122,16 +159,40 @@
   box-shadow: var(--dsw-shadow-lv1);
 }
 
+.card[data-failed='true'] {
+  border-color: var(--dsw-alias-state-error-primary);
+}
+
+.toggle {
+  flex: none;
+  margin: 0 12px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+}
+
+.toggle[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.card[data-saving='true'] .toggle {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .cardContent {
   box-sizing: border-box;
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: 100%;
+  min-width: 0;
   min-height: 52px;
   border: 0;
-  padding: 12px 14px;
+  padding: 12px 14px 12px 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -149,6 +210,14 @@
   outline-offset: -2px;
 }
 
+.cardText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .cardTitle {
   min-width: 0;
   overflow: hidden;
@@ -157,6 +226,18 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cardSummary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 17px;
 }
 
 .cardTrailing {
@@ -206,6 +287,13 @@
   color: var(--dsw-alias-state-success-primary);
 }
 
+.savingTag {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
 .chevron {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
@@ -216,6 +304,7 @@
 }
 
 .cardDetails {
+  flex-basis: 100%;
   border-top: 1px solid var(--dsw-alias-border-l2);
   padding: 10px 14px 12px;
   background: var(--dsw-alias-bg-module-platform);

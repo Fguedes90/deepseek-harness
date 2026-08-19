@@ -9,11 +9,13 @@ import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, NS } from '../src/client/index.ts'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInventorySettingsTab.tsx'
+import type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 
 usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
 const EMPTY = { entries: [] }
+const ENTRY_ID = '8a1b2c3d' as PluginEntryId
 type ListResult =
   | { readonly ok: true; readonly value: typeof EMPTY }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
@@ -24,6 +26,7 @@ async function bench() {
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
   class RemoteService extends Service {
+    $on = vi.fn(() => () => {})
     constructor(serviceCtx: Context) {
       super(serviceCtx, 'remote')
     }
@@ -31,8 +34,10 @@ async function bench() {
   new RemoteService(ctx)
   const list = vi.fn<() => Promise<ListResult>>()
     .mockResolvedValue({ ok: true, value: EMPTY })
-  ctx.provide('remote.pluginInventory', { list })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list }
+  const setEnabled = vi.fn<(entryId: string, enabled: boolean) => Promise<ListResult>>()
+    .mockResolvedValue({ ok: true, value: EMPTY })
+  ctx.provide('remote.pluginInventory', { list, setEnabled })
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, setEnabled }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -64,6 +69,17 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.list).toHaveBeenCalledOnce()
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
+
+    await expect(injected.setEnabled(ENTRY_ID, true)).resolves.toEqual(EMPTY)
+    expect(b.setEnabled).toHaveBeenCalledWith(ENTRY_ID, true)
+    b.setEnabled.mockResolvedValueOnce({ ok: false, error: { code: 'PLUGIN_PROTECTED', message: 'locked' } })
+    await expect(injected.setEnabled(ENTRY_ID, false))
+      .rejects.toThrow('pluginInventory.setEnabled failed: PLUGIN_PROTECTED: locked')
+
+    const listener = vi.fn()
+    const dispose = injected.subscribe(listener)
+    expect(dispose).toBeTypeOf('function')
+    dispose()
     await b.ctx.fiber.dispose()
   })
 

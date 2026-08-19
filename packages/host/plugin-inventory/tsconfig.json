@@ -15,7 +15,16 @@
       "path": "../../../vendor/loader"
     },
     {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../util/atomic-write"
+    },
+    {
       "path": "../../util/brand"
+    },
+    {
+      "path": "../../llm/llm"
     },
     {
       "path": "../../typert/protocol"

@@ -26,6 +26,7 @@ import {
   loadOverlayPatches,
   loadProfile,
   PROFILE_PATCH_FILENAME,
+  providePatchPath,
   watchUserPatches,
   type Profile,
 } from '@deepseek-ai/dsh-app-boot'
@@ -256,6 +257,10 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       args: options.args,
       exit: code => void shutdown.shutdown(code),
     })
+    // The profile-scoped file a runtime plugin writes user overrides into. It
+    // must be the profile's own layer, not the machine-global home layer,
+    // because entry ids are artifacts of that profile's composition.
+    providePatchPath(hostCtx, composed.profile.patchPath)
   })
   app.current = ctx
   // A surface can dispose the whole tree while boot or this post-boot watcher

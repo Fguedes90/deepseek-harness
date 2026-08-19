@@ -767,6 +767,30 @@ export interface Config {
 
 Source: [`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-plugin-inventory"></a>
+
+## `@deepseek-ai/dsh-host-plugin-inventory`
+
+Requires: `loader`
+
+```ts config-catalog
+/** Required launcher fact: which file records this deployment's user overrides. */
+export interface Config {
+  /**
+   * Absolute path of the profile's own `cordis.patch.yml`. Profile-scoped
+   * deliberately: an entry id is an artifact of one profile's composition, so
+   * recording it in the machine-global home layer would apply it to profiles
+   * that never had the row. The web bundle wires the launcher's `dshPatchPath`
+   * slot here; a composition that mounts this gateway without it fails
+   * validation at load rather than discovering it has nowhere to write on the
+   * first toggle.
+   */
+  readonly patchPath: string
+}
+```
+
+Source: [`packages/host/plugin-inventory/src/index.ts:89`](../packages/host/plugin-inventory/src/index.ts)
+
 <a id="deepseek-aidsh-host-webserver"></a>
 
 ## `@deepseek-ai/dsh-host-webserver`
@@ -2956,7 +2980,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
 - `@deepseek-ai/dsh-host-directory-picker-auto` — requires `webServer` · `loader` ([`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts))
 - `@deepseek-ai/dsh-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
-- `@deepseek-ai/dsh-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@deepseek-ai/dsh-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
 - `@deepseek-ai/dsh-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
