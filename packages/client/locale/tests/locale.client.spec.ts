@@ -230,11 +230,46 @@ describe('LocaleRuntime', () => {
     expect(svc.getLocale().active).toBe('zh')
   })
 
-  it('exposes the two shipped locales with self-described labels', () => {
+  it('exposes the shipped locales with self-described labels', () => {
     const { svc } = make()
     expect(svc.getLocale().locales).toEqual([
       { id: 'zh', label: '中文' },
       { id: 'en', label: 'English' },
+      { id: 'pt', label: 'Português' },
     ])
+  })
+
+  it('translates pt through the active -> en -> zh chain, never stopping at zh without en', () => {
+    const { svc } = make()
+    svc.register('ns', 'zh', { hello: '你好', onlyZh: '仅中文' })
+    svc.register('ns', 'en', { hello: 'Hello', tool: 'the tool' })
+    svc.register('ns', 'pt', { hello: 'Olá' })
+    const t = svc.bind('ns')
+    svc.setLocale('pt')
+    // A pt dictionary wins over the en fallback.
+    expect(t('hello')).toBe('Olá')
+    // A key missing from pt falls back to en, not zh.
+    expect(t('tool')).toBe('the tool')
+    // A key only zh carries (deliberately en-less) still resolves via zh.
+    expect(t('onlyZh')).toBe('仅中文')
+    // A translation that never landed anywhere echoes the key.
+    expect(t('missing.key')).toBe('missing.key')
+  })
+
+  it('leaves a namespace without a pt dictionary readable in en under pt active', () => {
+    const { svc } = make()
+    svc.register('ns', 'zh', { save: '保存' })
+    svc.register('ns', 'en', { save: 'Save' })
+    const t = svc.bind('ns')
+    svc.setLocale('pt')
+    expect(t('save')).toBe('Save')
+  })
+
+  it('opens provisionally in pt for a pt browser, then keeps zh as the no-language fallback', () => {
+    stubLanguages('pt-BR')
+    const service = make().svc
+    expect(service.getLocale().active).toBe('pt')
+    vi.stubGlobal('navigator', { languages: [], language: '' })
+    expect(make().svc.getLocale().active).toBe('zh')
   })
 })

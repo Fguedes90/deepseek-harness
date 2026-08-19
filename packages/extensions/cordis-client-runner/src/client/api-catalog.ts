@@ -132,9 +132,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'a registered locale id; unknown ids throw.' }],
       },
       {
-        signature: 'register<N extends keyof LocaleNamespaceMap & string>(ns: N, dicts: Record<LocaleId, LocaleDictOf<N>>): () => void',
-        description: 'Register a declared namespace\'s dictionaries, all locales in one call — the typed form: each dictionary is checked against the namespace\'s LocaleNamespaceMap key union (a missing or extra key is a compile error), and every shipped locale is required (bilingual balance enforced at registration). Duplicate (ns, locale) throws (single occupant; a namespace\'s texts have one owner). Registration bumps the revision so mounted outlets pick up late-arriving dictionaries.',
-        parameters: [{ name: 'ns', description: 'a namespace merged into LocaleNamespaceMap.' }, { name: 'dicts', description: 'complete dictionaries keyed by locale id.' }],
+        signature: 'register<N extends keyof LocaleNamespaceMap & string>( ns: N, dicts: { zh: LocaleDictOf<N>; en: LocaleDictOf<N>; pt?: LocaleDictOf<N> }, ): () => void',
+        description: 'Register a declared namespace\'s dictionaries, all locales in one call — the typed form: each dictionary is checked against the namespace\'s LocaleNamespaceMap key union (a missing or extra key is a compile error), and the zh/en pair is required (bilingual balance enforced at registration); `pt` is optional and falls back to `en` at lookup when absent. Duplicate (ns, locale) throws (single occupant; a namespace\'s texts have one owner). Registration bumps the revision so mounted outlets pick up late-arriving dictionaries.',
+        parameters: [{ name: 'ns', description: 'a namespace merged into LocaleNamespaceMap.' }, { name: 'dicts', description: 'dictionaries per locale: `zh` and `en` are required (bilingual balance); `pt` is optional and, where absent, the translation falls back to `en` through the lookup chain rather than to `zh`.' }],
         returns: 'disposer removing every locale registered by this call (idempotent).',
       },
       {
